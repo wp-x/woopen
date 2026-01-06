@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  woopen:
+    build: .
+    container_name: woopen
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - WOOPEN_ADMIN_PASSWORD=your_secure_password
+      - WOOPEN_SITE_URL=https://your-domain.com
+      - TZ=Asia/Shanghai
+    restart: unless-stopped

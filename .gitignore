@@ -1,0 +1,30 @@
+# Binaries
+woopen
+main
+test
+
+# Logs
+*.log
+web/frontend.log
+
+# Data
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+.cursorindexingignore
+.spec-workflow/
+.specstory/
+*.swp
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.vscode/
