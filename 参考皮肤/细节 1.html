@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WOOPEN_OS // 扩展包</title>
+    <style>
+        /* ====================
+           核心变量 (保持不变)
+           ==================== */
+        :root {
+            --bg-color: #0a0a0a;
+            --acid-green: #ccff00;
+            --acid-pink: #ff00ff;
+            --acid-cyan: #00ffff;
+            --pure-white: #ffffff;
+            --pure-black: #000000;
+            
+            --border-thick: 4px solid var(--pure-black);
+            --border-thin: 2px solid var(--pure-black);
+            --shadow-hard: 6px 6px 0px var(--pure-black);
+        }
+
+        * { box-sizing: border-box; cursor: crosshair; }
+        body {
+            margin: 0; padding: 0;
+            font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif; /* 增加中文字体 */
+            background-color: var(--bg-color);
+            color: var(--pure-black);
+            height: 100vh; overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        /* 背景特效 */
+        .noise-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; opacity: 0.05;
+            background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+            pointer-events: none;
+        }
+        .cyber-grid {
+            position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+            background-image: linear-gradient(var(--acid-green) 1px, transparent 1px), linear-gradient(90deg, var(--acid-green) 1px, transparent 1px);
+            background-size: 60px 60px;
+            transform: perspective(1000px) rotateX(60deg) translateY(0);
+            animation: cyber-move 10s linear infinite; opacity: 0.2; z-index: -1; pointer-events: none;
+        }
+        @keyframes cyber-move { 0% { transform: perspective(1000px) rotateX(60deg) translateY(0); } 100% { transform: perspective(1000px) rotateX(60deg) translateY(60px); } }
+
+        /* ====================
+           基础 UI 组件
+           ==================== */
+        .window-frame {
+            background: var(--pure-white);
+            border: var(--border-thick);
+            box-shadow: var(--shadow-hard);
+            position: absolute; display: none; flex-direction: column;
+            animation: slam-in 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+            max-height: 90vh; /* 防止溢出屏幕 */
+        }
+        .window-frame.active { display: flex; z-index: 100; }
+        @keyframes slam-in { 0% { transform: scale(0.9) skewX(5deg); opacity: 0; } 100% { transform: scale(1) skewX(0); opacity: 1; } }
+        
+        .window-header {
+            background: var(--pure-black); color: var(--acid-green);
+            padding: 10px 15px; font-weight: 900; text-transform: uppercase; font-size: 18px;
+            border-bottom: var(--border-thick); display: flex; justify-content: space-between; align-items: center;
+        }
+        .window-controls button {
+            background: var(--acid-pink); border: 2px solid white; color: white;
+            width: 25px; height: 25px; font-weight: bold; margin-left: 5px; box-shadow: 2px 2px 0 black;
+            cursor: pointer;
+        }
+        
+        .btn-brutal {
+            background: var(--pure-black); color: var(--pure-white);
+            border: none; padding: 15px 20px; font-size: 16px; font-weight: 900;
+            text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s;
+            cursor: pointer;
+        }
+        .btn-brutal:hover {
+            background: var(--acid-pink); color: var(--pure-black);
+            box-shadow: 4px 4px 0 var(--pure-black); transform: translate(-2px, -2px);
+        }
+        .btn-brutal:active { transform: translate(0, 0); box-shadow: none; }
+
+        /* ====================
+           1. 分享成功弹窗 (汉化版)
+           ==================== */
+        #view-share { width: 450px; }
+        .receipt-container {
+            padding: 20px;
+            background-image: radial-gradient(#ddd 10%, transparent 10%);
+            background-size: 10px 10px;
+        }
+        .success-banner {
+            background: var(--acid-green); border: var(--border-thick);
+            padding: 15px; text-align: center; font-size: 24px; font-weight: 900;
+            margin-bottom: 20px; box-shadow: 4px 4px 0 black;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .link-box {
+            background: white; border: 2px dashed black; padding: 15px; margin-bottom: 20px; position: relative;
+        }
+        .link-label {
+            position: absolute; top: -12px; left: 10px; background: black; color: white;
+            padding: 0 5px; font-size: 12px; font-weight: bold;
+        }
+        .url-display {
+            font-family: 'Courier New', monospace; font-weight: bold; font-size: 14px;
+            word-break: break-all; background: #eee; padding: 10px; border: 2px solid black;
+        }
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .meta-item { border: var(--border-thin); padding: 10px; background: white; }
+        .meta-title { font-size: 10px; font-weight: bold; color: #666; text-transform: uppercase; }
+        .meta-value { font-size: 18px; font-weight: 900; }
+        .password-stamp {
+            position: relative; background: var(--acid-pink); color: white; padding: 10px;
+            transform: rotate(-2deg); border: 2px solid black; box-shadow: 3px 3px 0 rgba(0,0,0,0.5); text-align: center;
+        }
+        .action-row { display: flex; gap: 10px; }
+
+        /* ====================
+           2. 媒体预览通用样式 (新增)
+           ==================== */
+        .media-viewer-container {
+            padding: 0;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ====================
+           3. 视频预览弹窗 (新增)
+           ==================== */
+        #view-video { width: 600px; }
+        
+        /* 视频容器 */
+        .video-wrapper {
+            width: 100%;
+            position: relative;
+            border-bottom: var(--border-thick);
+        }
+        video {
+            width: 100%;
+            display: block;
+            outline: none;
+        }
+        
+        /* 录制状态叠加层 (UI 装饰) */
+        .rec-overlay {
+            position: absolute; top: 15px; left: 15px;
+            display: flex; align-items: center; gap: 8px;
+            pointer-events: none; z-index: 5;
+        }
+        .rec-dot {
+            width: 12px; height: 12px; background: red; border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        .rec-text { color: red; font-weight: bold; font-family: monospace; letter-spacing: 2px; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* 视频控制栏 */
+        .video-controls-bar {
+            padding: 10px; background: white;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .time-code { font-family: monospace; font-size: 14px; font-weight: bold; }
+
+        /* ====================
+           4. 图片预览弹窗 (新增)
+           ==================== */
+        #view-image { width: 500px; }
+
+        .image-stage {
+            /* 棋盘格背景，表示透明 */
+            background-color: #eee;
+            background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            
+            width: 100%; min-height: 300px;
+            display: flex; align-items: center; justify-content: center;
+            border-bottom: var(--border-thick);
+            padding: 20px;
+        }
+
+        .preview-img {
+            max-width: 100%; max-height: 400px;
+            border: 2px solid black;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+        }
+
+        .file-info-bar {
+            background: var(--pure-black); color: white;
+            padding: 12px;
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            font-family: monospace; font-size: 12px;
+            text-align: center;
+        }
+        .file-info-item span { color: var(--acid-green); display: block; font-weight: bold; }
+
+        /* ====================
+           顶部通知 (保持并汉化)
+           ==================== */
+        .toast-container {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; pointer-events: none;
+        }
+        .toast-box {
+            background: var(--pure-white); border: var(--border-thick); box-shadow: 8px 8px 0 var(--pure-black);
+            min-width: 350px; display: flex; flex-direction: column; pointer-events: auto;
+            transform: translateY(-150%); transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+        .toast-box.show { transform: translateY(0); }
+        .toast-content { padding: 15px 20px; display: flex; align-items: center; gap: 15px; }
+        .toast-icon { font-size: 30px; }
+        .toast-text { display: flex; flex-direction: column; }
+        .toast-title { font-weight: 900; font-size: 16px; text-transform: uppercase; }
+        .toast-desc { font-family: monospace; font-size: 12px; color: #555; margin-top: 2px; }
+        .toast-progress { height: 6px; width: 100%; background: black; position: relative; }
+        .toast-bar { height: 100%; background: var(--acid-green); width: 100%; transition: width linear; }
+        .toast-box.success .toast-bar { background: var(--acid-green); }
+        .toast-box.error .toast-icon { color: red; }
+        .toast-box.error .toast-bar { background: red; }
+
+        /* ====================
+           底部 Dock
+           ==================== */
+        .dock {
+            position: fixed; bottom: 20px;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            padding: 10px; border: 2px solid white;
+            display: flex; gap: 15px; z-index: 999;
+        }
+        .dock-btn {
+            height: 40px; padding: 0 15px; background: white; border: 2px solid black;
+            font-size: 14px; font-weight: bold; cursor: pointer;
+            box-shadow: 4px 4px 0 var(--acid-pink); transition: 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .dock-btn:hover { transform: translateY(-5px); background: var(--acid-green); }
+        .dock-btn.active { background: var(--acid-cyan); box-shadow: none; transform: translate(4px, 4px); }
+
+    </style>
+</head>
+<body>
+
+    <div class="noise-bg"></div>
+    <div class="cyber-grid"></div>
+
+    <!-- 1. 分享成功弹窗 -->
+    <div id="view-share" class="window-frame">
+        <div class="window-header">
+            <span>链接生成器_v2</span>
+            <div class="window-controls"><button onclick="closeAll()">X</button></div>
+        </div>
+        
+        <div class="receipt-container">
+            <div class="success-banner">
+                <span>★</span> 链接已生成 <span>★</span>
+            </div>
+            <div class="link-box">
+                <span class="link-label">公开链接地址</span>
+                <div class="url-display" id="share-url">https://woopen.com/s/X9a2_K9z</div>
+            </div>
+            <div class="meta-grid">
+                <div class="meta-item">
+                    <div class="meta-title">有效期</div>
+                    <div class="meta-value">7 天</div>
+                </div>
+                <div class="meta-item" style="border-style: dashed;">
+                    <div class="meta-title">访问提取码</div>
+                    <div class="password-stamp">W889</div>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn-brutal" style="flex: 2; background: var(--acid-cyan); color: black;" onclick="copyLink(this)">
+                    复制链接
+                </button>
+                <button class="btn-brutal" style="flex: 1; background: white; color: black;" onclick="window.open('#', '_blank')">
+                    直接打开 ↗
+                </button>
+            </div>
+            <div style="text-align: center; margin-top: 15px; font-family: monospace; font-size: 10px; color: #555;">
+                // 生成时间: <span id="timestamp">00:00:00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 视频预览弹窗 (新增) -->
+    <div id="view-video" class="window-frame">
+        <div class="window-header">
+            <span>媒体播放器 // .MP4</span>
+            <div class="window-controls"><button onclick="closeAll()">X</button></div>
+        </div>
+        <div class="video-wrapper">
+            <!-- 录制状态装饰 -->
+            <div class="rec-overlay">
+                <div class="rec-dot"></div>
+                <div class="rec-text">REC</div>
+            </div>
+            <!-- 视频占位符，实际开发可换成真实 URL -->
+            <video id="demo-video" controls poster="https://via.placeholder.com/600x340/000000/FFFFFF?text=VIDEO+SIGNAL+LOST">
+                <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+                您的浏览器不支持视频标签。
+            </video>
+        </div>
+        <div class="video-controls-bar">
+            <div class="time-code">00:00:00:12</div>
+            <div>
+                <button class="btn-brutal" style="padding: 5px 15px; font-size: 12px;">下载原片</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 图片预览弹窗 (新增) -->
+    <div id="view-image" class="window-frame">
+        <div class="window-header">
+            <span>图像查看器 // .PNG</span>
+            <div class="window-controls"><button onclick="closeAll()">X</button></div>
+        </div>
+        <div class="image-stage">
+            <!-- 演示图片 -->
+            <img src="https://picsum.photos/400/300" alt="Preview" class="preview-img">
+        </div>
+        <div class="file-info-bar">
+            <div class="file-info-item"><span>格式</span>PNG 24bit</div>
+            <div class="file-info-item"><span>分辨率</span>1920x1080</div>
+            <div class="file-info-item"><span>大小</span>2.4 MB</div>
+        </div>
+        <div style="padding: 10px; background: white; display:flex; gap:10px;">
+             <button class="btn-brutal" style="width:100%; background: white; color: black; border: 2px solid black;">全屏查看</button>
+             <button class="btn-brutal" style="width:100%; background: var(--acid-green); color: black;">下载图片</button>
+        </div>
+    </div>
+
+    <!-- 顶部 Toast 通知 -->
+    <div class="toast-container">
+        <div class="toast-box" id="global-toast">
+            <div class="toast-content">
+                <div class="toast-icon">💾</div>
+                <div class="toast-text">
+                    <div class="toast-title" id="toast-title">下载已开始</div>
+                    <div class="toast-desc" id="toast-msg">正在请求安全节点...</div>
+                </div>
+                <button onclick="document.getElementById('global-toast').classList.remove('show')" style="margin-left: auto; background: none; border: 2px solid black; font-weight: bold; cursor: pointer;">X</button>
+            </div>
+            <div class="toast-progress">
+                <div class="toast-bar" id="toast-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部 Dock 菜单 -->
+    <div class="dock">
+        <button class="dock-btn active" onclick="switchView('view-share', this)">分享结果</button>
+        <button class="dock-btn" onclick="switchView('view-video', this)">视频预览</button>
+        <button class="dock-btn" onclick="switchView('view-image', this)">图片预览</button>
+        <div style="width: 2px; background: white; margin: 0 5px;"></div>
+        <button class="dock-btn" onclick="triggerToast('success')">成功提示</button>
+        <button class="dock-btn" style="color:red; border-color:red" onclick="triggerToast('error')">失败提示</button>
+    </div>
+
+    <script>
+        // 时间戳更新
+        const now = new Date();
+        document.getElementById('timestamp').innerText = now.toTimeString().split(' ')[0];
+
+        // 切换视图逻辑
+        function switchView(id, btn) {
+            // 先关闭所有
+            closeAll();
+            
+            // 打开目标
+            document.getElementById(id).classList.add('active');
+            if(btn) btn.classList.add('active');
+
+            // 特殊处理：如果是打开视频窗口，且有视频资源，可以在这里自动播放（可选）
+            if(id === 'view-video') {
+                // document.getElementById('demo-video').play(); 
+            }
+        }
+
+        function closeAll() {
+            // 隐藏所有窗口
+            document.querySelectorAll('.window-frame').forEach(el => el.classList.remove('active'));
+            // 重置按钮状态
+            document.querySelectorAll('.dock-btn').forEach(el => el.classList.remove('active'));
+            
+            // 停止视频播放 (防止关闭弹窗后声音还在)
+            const video = document.getElementById('demo-video');
+            if(video) video.pause();
+        }
+
+        // 复制链接逻辑
+        function copyLink(btn) {
+            const originalText = btn.innerText;
+            const originalColor = btn.style.backgroundColor;
+            const url = document.getElementById('share-url').innerText;
+
+            navigator.clipboard.writeText(url).then(() => {
+                btn.innerText = "已复制!";
+                btn.style.backgroundColor = "var(--acid-green)";
+                triggerToast('success', '链接已复制到剪贴板');
+            }).catch(() => {
+                btn.innerText = "复制成功!"; // 降级处理
+                btn.style.backgroundColor = "var(--acid-green)";
+            });
+
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.backgroundColor = originalColor;
+            }, 2000);
+        }
+
+        // Toast 逻辑
+        let toastTimeout;
+        function triggerToast(type, customMsg) {
+            const toast = document.getElementById('global-toast');
+            const bar = document.getElementById('toast-bar');
+            const title = document.getElementById('toast-title');
+            const msg = document.getElementById('toast-msg');
+            const icon = document.querySelector('.toast-icon');
+
+            toast.classList.remove('show', 'success', 'error');
+            void toast.offsetWidth; // 重绘
+            
+            if (type === 'success') {
+                toast.classList.add('success');
+                title.innerText = "操作成功";
+                msg.innerText = customMsg || "数据传输已完成。";
+                icon.innerText = "✅";
+                bar.style.backgroundColor = "var(--acid-green)";
+            } else if (type === 'error') {
+                toast.classList.add('error');
+                title.innerText = "下载失败";
+                msg.innerText = "网络超时 (错误代码 503)。";
+                icon.innerText = "⚠️";
+                icon.style.color = "red";
+                bar.style.backgroundColor = "red";
+            }
+
+            toast.classList.add('show');
+            
+            bar.style.transition = 'none';
+            bar.style.width = '100%';
+            setTimeout(() => {
+                bar.style.transition = 'width 3s linear';
+                bar.style.width = '0%';
+            }, 10);
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // 默认显示分享窗口
+        switchView('view-share', document.querySelector('.dock-btn'));
+    </script>
+</body>
+</html>
