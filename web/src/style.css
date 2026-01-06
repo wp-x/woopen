@@ -1,0 +1,455 @@
+/* ====================
+   CORE VARIABLES & RESET (NEW BRUTALISM)
+   ==================== */
+:root {
+  --bg-color: #0a0a0a;
+  --acid-green: #ccff00;
+  --acid-pink: #ff00ff;
+  --acid-cyan: #00ffff;
+  --pure-white: #ffffff;
+  --pure-black: #000000;
+
+  --border-thick: 4px solid var(--pure-black);
+  --border-thin: 2px solid var(--pure-black);
+  --shadow-hard: 6px 6px 0px var(--pure-black);
+  --shadow-reverse: -4px -4px 0px var(--acid-green);
+
+  /* Element Plus Overrides */
+  --el-color-primary: var(--pure-black);
+  /* Primary buttons are black by default in this theme */
+  --el-color-success: var(--acid-green);
+  --el-color-warning: var(--acid-pink);
+  --el-color-danger: #ff0000;
+  --el-bg-color: var(--pure-white);
+  --el-text-color-primary: var(--pure-black);
+  --el-text-color-regular: #333;
+
+  --header-height: 60px;
+}
+
+* {
+  box-sizing: border-box;
+  /* cursor: crosshair; */
+  /* User might find this annoying for a real app, keeping default or pointer */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--pure-black);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ====================
+   BACKGROUND FX
+   ==================== */
+.noise-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+  opacity: 0.05;
+  background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+  pointer-events: none;
+}
+
+.cyber-grid {
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background-image:
+    linear-gradient(var(--acid-green) 1px, transparent 1px),
+    linear-gradient(90deg, var(--acid-green) 1px, transparent 1px);
+  background-size: 60px 60px;
+  transform: perspective(1000px) rotateX(60deg) translateY(0);
+  animation: cyber-move 10s linear infinite;
+  opacity: 0.2;
+  z-index: -1;
+  pointer-events: none;
+}
+
+@keyframes cyber-move {
+  0% {
+    transform: perspective(1000px) rotateX(60deg) translateY(0);
+  }
+
+  100% {
+    transform: perspective(1000px) rotateX(60deg) translateY(60px);
+  }
+}
+
+/* ====================
+   UI COMPONENTS (NEO-BRUTALISM)
+   ==================== */
+.window-frame {
+  background: var(--pure-white);
+  border: var(--border-thick);
+  box-shadow: var(--shadow-hard);
+}
+
+.window-header {
+  background: var(--pure-black);
+  color: var(--acid-green);
+  padding: 10px 15px;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 20px;
+  letter-spacing: -1px;
+  border-bottom: var(--border-thick);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Brutalist Button */
+.btn-brutal {
+  background: var(--pure-black);
+  color: var(--pure-white);
+  border: none;
+  padding: 15px 30px;
+  font-size: 18px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  transition: transform 0.1s;
+  cursor: pointer;
+}
+
+.btn-brutal:hover {
+  background: var(--acid-pink);
+  color: var(--pure-black);
+  box-shadow: 4px 4px 0 var(--pure-black);
+  transform: translate(-2px, -2px);
+}
+
+.btn-brutal:active {
+  transform: translate(0, 0);
+  box-shadow: none;
+}
+
+/* Element Plus Button Overrides to match Brutal style */
+.el-button--primary {
+  --el-button-bg-color: var(--pure-black);
+  --el-button-border-color: var(--pure-black);
+  --el-button-hover-bg-color: var(--acid-pink);
+  --el-button-hover-border-color: var(--acid-pink);
+  --el-button-hover-text-color: var(--pure-black);
+  border-radius: 0 !important;
+  font-weight: 900;
+  border: 2px solid var(--pure-black) !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+  transition: all 0.1s;
+}
+
+.el-button--primary:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--pure-black);
+}
+
+.el-input__wrapper {
+  border-radius: 0 !important;
+  border: 2px solid var(--pure-black) !important;
+  box-shadow: none !important;
+  background-color: #eee;
+}
+
+.el-input__wrapper:hover,
+.el-input__wrapper.is-focus {
+  background-color: var(--acid-green) !important;
+  box-shadow: 4px 4px 0 var(--pure-black) !important;
+}
+
+.el-card {
+  border-radius: 0 !important;
+  border: var(--border-thin) !important;
+  box-shadow: 4px 4px 0 var(--pure-black) !important;
+  overflow: visible !important;
+  /* Allow shadows to show */
+}
+
+/* Global transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: var(--pure-black);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--acid-green);
+  border: 2px solid var(--pure-black);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--pure-black);
+}
+
+/* Element Plus Table Overrides */
+.el-table {
+  --el-table-header-bg-color: var(--pure-black);
+  --el-table-header-text-color: var(--pure-white);
+  --el-table-row-hover-bg-color: var(--acid-cyan) !important;
+  --el-table-border-color: var(--pure-black);
+  border: var(--border-thick) !important;
+  font-family: monospace;
+}
+
+.el-table th.el-table__cell {
+  background-color: var(--pure-black) !important;
+  color: var(--pure-white) !important;
+  border-bottom: var(--border-thick) !important;
+  text-transform: uppercase;
+  font-weight: 900;
+}
+
+/* File Name Wrapping */
+.file-name {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.name-text {
+  flex: 1;
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.file-icon-brutal svg {
+  stroke: var(--pure-black);
+  stroke-width: 40px !important;
+  /* Thicken the lines */
+}
+
+.el-table td.el-table__cell {
+  border-bottom: var(--border-thin) !important;
+  color: var(--pure-black);
+  font-weight: bold;
+  padding: 8px 0 !important;
+  /* Compact padding */
+}
+
+/* Remove default table borders to use ours */
+.el-table--border::after,
+.el-table--group::after,
+.el-table::before {
+  display: none;
+}
+
+/* Dialog Brutal Ops */
+.el-dialog {
+  border-radius: 0 !important;
+  border: var(--border-thick) !important;
+  box-shadow: var(--shadow-hard) !important;
+  background: var(--pure-white) !important;
+}
+
+.el-dialog__header {
+  background: var(--pure-black);
+  margin-right: 0 !important;
+  padding: 15px 20px !important;
+  border-bottom: var(--border-thick);
+}
+
+.el-dialog__title {
+  color: var(--acid-green) !important;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-family: 'Helvetica Neue', sans-serif;
+}
+
+.el-dialog__headerbtn .el-dialog__close {
+  color: var(--pure-white) !important;
+  font-weight: bold;
+}
+
+.el-dialog__headerbtn:hover .el-dialog__close {
+  color: var(--acid-pink) !important;
+}
+
+/* Breadcrumb */
+.el-breadcrumb__inner {
+  font-family: monospace;
+  font-weight: bold;
+  color: var(--pure-black) !important;
+}
+
+.el-breadcrumb__inner.is-link:hover {
+  color: var(--acid-pink) !important;
+}
+
+.el-tag {
+  border-radius: 0 !important;
+  border: 2px solid var(--pure-black) !important;
+  font-weight: bold;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.1);
+  color: var(--pure-black) !important;
+}
+
+.el-tag--success {
+  background-color: var(--acid-green) !important;
+}
+
+.el-tag--danger {
+  background-color: #ff4d4d !important;
+  color: white !important;
+}
+
+.el-tag--info {
+  background-color: #eee !important;
+}
+
+/* Alert */
+.el-alert {
+  border: 2px solid var(--pure-black);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Brutal Small Button */
+.btn-brutal-small {
+  border: 2px solid var(--pure-black) !important;
+  background: var(--pure-white) !important;
+  color: var(--pure-black) !important;
+  border-radius: 0 !important;
+  font-weight: 900 !important;
+  padding: 8px 16px !important;
+  font-size: 13px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 3px 3px 0 var(--pure-black);
+  transition: all 0.1s;
+}
+
+.btn-brutal-small:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 var(--pure-black);
+  background: var(--acid-cyan) !important;
+}
+
+.btn-brutal-small:active {
+  transform: translate(0, 0);
+  box-shadow: 2px 2px 0 var(--pure-black);
+}
+
+.btn-brutal-small.secondary:hover {
+  background: var(--acid-pink) !important;
+}
+
+/* Primary (Green) variant */
+.btn-brutal-small.el-button[style*="acid-green"],
+.btn-brutal-small[style*="acid-green"] {
+  background: var(--acid-green) !important;
+  color: var(--pure-black) !important;
+}
+
+.btn-brutal-small.el-button[style*="acid-green"]:hover,
+.btn-brutal-small[style*="acid-green"]:hover {
+  background: var(--acid-cyan) !important;
+}
+
+/* Danger (Pink) variant */
+.btn-brutal-small.el-button[style*="acid-pink"],
+.btn-brutal-small[style*="acid-pink"] {
+  background: var(--acid-pink) !important;
+  color: var(--pure-white) !important;
+}
+
+.btn-brutal-small.el-button[style*="acid-pink"]:hover,
+.btn-brutal-small[style*="acid-pink"]:hover {
+  background: red !important;
+}
+
+/* Dark variant */
+.btn-brutal-small.el-button[style*="black"],
+.btn-brutal-small[style*="black"] {
+  background: var(--pure-black) !important;
+  color: var(--pure-white) !important;
+}
+
+.btn-brutal-small.el-button[style*="black"]:hover,
+.btn-brutal-small[style*="black"]:hover {
+  background: var(--acid-pink) !important;
+  color: var(--pure-black) !important;
+}
+
+/* Brutal Icon Button */
+.btn-brutal-icon {
+  border: 2px solid var(--pure-black) !important;
+  background: var(--pure-white) !important;
+  color: var(--pure-black) !important;
+  border-radius: 0 !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 2px 2px 0 var(--pure-black);
+}
+
+.btn-brutal-icon:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--pure-black);
+  background: var(--acid-green) !important;
+}
+
+.btn-brutal-icon.danger:hover {
+  background: #ff4d4d !important;
+  color: white !important;
+}
+
+/* Status Tags */
+.status-tag {
+  border: 2px solid var(--pure-black);
+  padding: 2px 6px;
+  font-weight: bold;
+  font-size: 12px;
+  background: white;
+}
+
+.status-tag.yes {
+  background: var(--acid-green);
+}
+
+.status-tag.no {
+  background: #eee;
+  color: #999;
+}
+
+.status-tag.online {
+  background: var(--acid-green);
+}
+
+.status-tag.offline {
+  background: red;
+  color: white;
+}
+
+.link-actions,
+.row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

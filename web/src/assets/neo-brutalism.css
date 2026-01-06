@@ -1,0 +1,302 @@
+/* ====================
+   CORE VARIABLES & RESET
+   ==================== */
+:root {
+    --bg-color: #0a0a0a;
+    --acid-green: #ccff00;
+    --acid-pink: #ff00ff;
+    --acid-cyan: #00ffff;
+    --pure-white: #ffffff;
+    --pure-black: #000000;
+
+    --border-thick: 4px solid var(--pure-black);
+    --border-thin: 2px solid var(--pure-black);
+    --shadow-hard: 6px 6px 0px var(--pure-black);
+    --shadow-reverse: -4px -4px 0px var(--acid-green);
+}
+
+@media (max-width: 768px) {
+    :root {
+        --border-thick: 3px solid var(--pure-black);
+        --shadow-hard: 4px 4px 0px var(--pure-black);
+        --shadow-reverse: -3px -3px 0px var(--acid-green);
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--pure-black);
+    min-height: 100vh;
+}
+
+/* On mobile, we might not always want center alignment for long content */
+@media (max-width: 768px) {
+    body {
+        align-items: flex-start;
+        /* Allow scrolling from top */
+        padding-top: 20px;
+        padding-bottom: 20px;
+        height: auto;
+        overflow-y: auto;
+    }
+}
+
+/* ====================
+   BACKGROUND FX
+   ==================== */
+.noise-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    opacity: 0.05;
+    background: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+    pointer-events: none;
+}
+
+.cyber-grid {
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background-image:
+        linear-gradient(var(--acid-green) 1px, transparent 1px),
+        linear-gradient(90deg, var(--acid-green) 1px, transparent 1px);
+    background-size: 60px 60px;
+    transform: perspective(1000px) rotateX(60deg) translateY(0);
+    animation: cyber-move 10s linear infinite;
+    opacity: 0.2;
+    z-index: -1;
+    pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    .cyber-grid {
+        background-size: 40px 40px;
+    }
+}
+
+@keyframes cyber-move {
+    0% {
+        transform: perspective(1000px) rotateX(60deg) translateY(0);
+    }
+
+    100% {
+        transform: perspective(1000px) rotateX(60deg) translateY(60px);
+    }
+}
+
+@media (max-width: 768px) {
+    @keyframes cyber-move {
+        0% {
+            transform: perspective(1000px) rotateX(60deg) translateY(0);
+        }
+
+        100% {
+            transform: perspective(1000px) rotateX(60deg) translateY(40px);
+        }
+    }
+}
+
+/* ====================
+   UI COMPONENTS (NEO-BRUTALISM)
+   ==================== */
+.window-frame {
+    background: var(--pure-white);
+    border: var(--border-thick);
+    box-shadow: var(--shadow-hard);
+    display: flex;
+    flex-direction: column;
+    animation: slam-in 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+    position: relative;
+    max-width: 100%;
+    z-index: 10;
+}
+
+@media (max-width: 768px) {
+    .window-frame {
+        width: 94%;
+        max-height: none;
+        /* Let content expand */
+        min-height: auto;
+        margin: 0 auto;
+    }
+}
+
+@keyframes slam-in {
+    0% {
+        transform: scale(0.9) skewX(5deg);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1) skewX(0);
+        opacity: 1;
+    }
+}
+
+.window-header {
+    background: var(--pure-black);
+    color: var(--acid-green);
+    padding: 10px 15px;
+    font-weight: 900;
+    text-transform: uppercase;
+    font-size: 20px;
+    letter-spacing: -1px;
+    border-bottom: var(--border-thick);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .window-header {
+        font-size: 16px;
+        letter-spacing: -0.5px;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+    }
+}
+
+.window-controls button {
+    background: var(--acid-pink);
+    border: 2px solid white;
+    color: white;
+    width: 25px;
+    height: 25px;
+    font-weight: bold;
+    line-height: 20px;
+    margin-left: 5px;
+    box-shadow: 2px 2px 0 black;
+    cursor: pointer;
+}
+
+.content-area {
+    padding: 20px;
+    position: relative;
+}
+
+@media (max-width: 768px) {
+    .content-area {
+        padding: 15px;
+    }
+}
+
+/* Inputs */
+.brutal-input {
+    width: 100%;
+    background: #eee;
+    border: var(--border-thick);
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 15px;
+    transition: 0.1s;
+    outline: none;
+}
+
+.brutal-input:focus {
+    background: var(--acid-green);
+    box-shadow: 4px 4px 0 var(--pure-black);
+}
+
+@media (max-width: 768px) {
+    .brutal-input {
+        padding: 12px;
+        font-size: 14px;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .brutal-input:focus {
+        box-shadow: 3px 3px 0 var(--pure-black);
+    }
+}
+
+/* Buttons */
+.btn-brutal {
+    background: var(--pure-black);
+    color: var(--pure-white);
+    border: none;
+    padding: 15px 30px;
+    font-size: 18px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: relative;
+    transition: transform 0.1s;
+    cursor: pointer;
+    display: inline-block;
+    text-decoration: none;
+    text-align: center;
+}
+
+.btn-brutal:hover {
+    background: var(--acid-pink);
+    color: var(--pure-black);
+    box-shadow: 4px 4px 0 var(--pure-black);
+    transform: translate(-2px, -2px);
+}
+
+.btn-brutal:active {
+    transform: translate(0, 0);
+    box-shadow: none;
+}
+
+@media (max-width: 768px) {
+    .btn-brutal {
+        width: 100%;
+        padding: 12px 20px;
+        font-size: 16px;
+        border-radius: 0;
+    }
+
+    .btn-brutal:hover {
+        transform: none;
+        /* No hover on mobile usually */
+    }
+
+    .btn-brutal:active {
+        background: var(--acid-pink);
+        color: var(--pure-black);
+        transform: translate(2px, 2px);
+        box-shadow: inset 0 0 0 2px black;
+    }
+}
+
+/* Tags */
+.tag {
+    display: inline-block;
+    background: var(--acid-cyan);
+    border: var(--border-thin);
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-right: 5px;
+    box-shadow: 2px 2px 0 black;
+}
+
+/* Labels */
+.brutal-label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+}
+
+@media (max-width: 768px) {
+    .brutal-label {
+        font-size: 12px;
+    }
+}
