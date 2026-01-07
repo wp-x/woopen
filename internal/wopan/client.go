@@ -140,7 +140,8 @@ func (c *Client) ListFiles(dirID string, page, pageSize int) ([]*model.FileInfo,
 
 	files := make([]*model.FileInfo, 0, len(data.Files))
 	for _, f := range data.Files {
-		modTime, _ := time.Parse("2006-01-02 15:04:05", f.CreateTime)
+		// API 返回的时间格式为 "yyyyMMddHHmmss"，例如 "20241009162834"
+		modTime, _ := time.Parse("20060102150405", f.CreateTime)
 		files = append(files, &model.FileInfo{
 			ID:       f.Id,
 			FID:      f.Fid,
