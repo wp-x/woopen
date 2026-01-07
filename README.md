@@ -32,6 +32,22 @@
 
 <br>
 
+## 预览
+
+**登录页面**
+
+![登录页面](./docs/images/login.png)
+
+**后台管理**
+
+![后台管理](./docs/images/image.png)
+
+**分享页面**
+
+![分享页面](./docs/images/share.png)
+
+<br>
+
 ## 部署
 
 ### 先拿到联通云盘的 Token
