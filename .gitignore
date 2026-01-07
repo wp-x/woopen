@@ -4,6 +4,9 @@ main
 test
 *.exe
 
+# Development Scripts
+start.sh
+
 # Logs
 *.log
 
