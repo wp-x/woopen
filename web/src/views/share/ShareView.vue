@@ -57,6 +57,13 @@
 
         <!-- Folder Content -->
         <div v-if="shareInfo.target_type === 'folder'" class="folder-content">
+           <!-- 下载次数限制提示 -->
+           <div v-if="shareInfo.max_downloads && shareInfo.max_downloads > 0" class="download-limit-info folder-limit-info">
+               <span v-if="!shareInfo.download_exhausted">
+                   剩余下载次数：{{ shareInfo.remaining_downloads }} / {{ shareInfo.max_downloads }}
+               </span>
+               <span v-else class="exhausted-warning">下载次数已耗尽，无法继续下载</span>
+           </div>
            <!-- Toolbar -->
            <div class="brutal-toolbar">
               <div class="nav-breadcrumbs">
@@ -100,7 +107,15 @@
                     </span>
                     <span style="flex: 1; font-family: monospace;">{{ file.is_dir ? '<DIR>' : formatSize(file.size) }}</span>
                     <span style="flex: 1; text-align: right;">
-                        <button v-if="!file.is_dir" class="txt-btn" @click.stop="downloadFolderFile(file)">[下载]</button>
+                        <button
+                            v-if="!file.is_dir"
+                            class="txt-btn"
+                            :class="{ 'disabled': shareInfo?.download_exhausted }"
+                            :disabled="shareInfo?.download_exhausted"
+                            @click.stop="downloadFolderFile(file)"
+                        >
+                            {{ shareInfo?.download_exhausted ? '[已关闭]' : '[下载]' }}
+                        </button>
                         <button v-if="!file.is_dir && canPreview(file.name)" class="txt-btn" @click.stop="previewFolderFile(file)">[预览]</button>
                     </span>
                 </div>
@@ -127,9 +142,23 @@
 
         <!-- Single File Actions -->
         <div v-else class="single-file-actions">
+            <!-- 下载次数限制提示 -->
+            <div v-if="shareInfo.max_downloads && shareInfo.max_downloads > 0" class="download-limit-info">
+                <span v-if="!shareInfo.download_exhausted">
+                    剩余下载次数：{{ shareInfo.remaining_downloads }} / {{ shareInfo.max_downloads }}
+                </span>
+                <span v-else class="exhausted-warning">下载次数已耗尽</span>
+            </div>
             <!-- Compact Actions without giant icon -->
             <div class="action-buttons file-action-buttons">
-                <button class="btn-brutal sound-click primary-action" @click="downloadFile">立即下载</button>
+                <button
+                    class="btn-brutal sound-click primary-action"
+                    :class="{ 'disabled': shareInfo.download_exhausted }"
+                    :disabled="shareInfo.download_exhausted"
+                    @click="downloadFile"
+                >
+                    {{ shareInfo.download_exhausted ? '下载已关闭' : '立即下载' }}
+                </button>
                 <button v-if="previewType !== 'none'" class="btn-brutal sound-click secondary-action" @click="showPreview = true">在线预览</button>
             </div>
         </div>
@@ -259,6 +288,10 @@ const shareInfo = ref<{
   target_type: string
   target_name: string
   target_id?: string
+  max_downloads?: number
+  download_count?: number
+  remaining_downloads?: number
+  download_exhausted?: boolean
 } | null>(null)
 
 const needPassword = ref(false)
@@ -427,6 +460,13 @@ async function loadFolderFiles(dirId?: string) {
     if (res.code === 0) {
       folderFiles.value = res.data.files || []
       currentFolderId.value = res.data.current_id
+      // 更新下载限制信息
+      if (shareInfo.value) {
+        shareInfo.value.max_downloads = res.data.max_downloads
+        shareInfo.value.download_count = res.data.download_count
+        shareInfo.value.remaining_downloads = res.data.remaining_downloads
+        shareInfo.value.download_exhausted = res.data.download_exhausted
+      }
     }
   } catch (err) { } finally {
     loadingFiles.value = false
@@ -755,6 +795,38 @@ onUnmounted(() => {
 .grid-size {
     font-size: 10px;
     color: #666;
+}
+
+/* 下载次数限制提示 */
+.download-limit-info {
+    text-align: center;
+    margin-bottom: 15px;
+    font-family: monospace;
+    font-weight: bold;
+    padding: 10px;
+    background: #f0f0f0;
+    border: 2px solid black;
+}
+
+.folder-limit-info {
+    margin-bottom: 20px;
+}
+
+.exhausted-warning {
+    color: red;
+    animation: text-flash 0.5s infinite;
+}
+
+.btn-brutal.disabled,
+.txt-btn.disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+
+.btn-brutal.disabled {
+    background: #ccc !important;
+    box-shadow: none !important;
 }
 
 /* Single File Actions */

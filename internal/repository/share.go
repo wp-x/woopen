@@ -19,8 +19,8 @@ func NewShareRepository(db *sql.DB) *ShareRepository {
 // Create 创建分享
 func (r *ShareRepository) Create(share *model.Share) error {
 	result, err := r.db.Exec(`
-		INSERT INTO shares (share_code, target_type, target_id, target_path, target_name, password, expire_at, description, is_active)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO shares (share_code, target_type, target_id, target_path, target_name, password, expire_at, description, is_active, max_downloads)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		share.ShareCode,
 		share.TargetType,
@@ -31,6 +31,7 @@ func (r *ShareRepository) Create(share *model.Share) error {
 		share.ExpireAt,
 		share.Description,
 		share.IsActive,
+		share.MaxDownloads,
 	)
 	if err != nil {
 		return err
@@ -47,9 +48,10 @@ func (r *ShareRepository) Create(share *model.Share) error {
 func (r *ShareRepository) GetByCode(code string) (*model.Share, error) {
 	var share model.Share
 	var expireAt sql.NullTime
+	var maxDownloads sql.NullInt64
 	err := r.db.QueryRow(`
-		SELECT id, share_code, target_type, target_id, target_path, target_name, 
-			   password, expire_at, description, created_at, is_active, view_count, download_count
+		SELECT id, share_code, target_type, target_id, target_path, target_name,
+			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads
 		FROM shares WHERE share_code = ?
 	`, code).Scan(
 		&share.ID,
@@ -65,12 +67,16 @@ func (r *ShareRepository) GetByCode(code string) (*model.Share, error) {
 		&share.IsActive,
 		&share.ViewCount,
 		&share.DownloadCount,
+		&maxDownloads,
 	)
 	if err != nil {
 		return nil, err
 	}
 	if expireAt.Valid {
 		share.ExpireAt = &expireAt.Time
+	}
+	if maxDownloads.Valid {
+		share.MaxDownloads = maxDownloads.Int64
 	}
 	return &share, nil
 }
@@ -79,9 +85,10 @@ func (r *ShareRepository) GetByCode(code string) (*model.Share, error) {
 func (r *ShareRepository) GetByID(id int64) (*model.Share, error) {
 	var share model.Share
 	var expireAt sql.NullTime
+	var maxDownloads sql.NullInt64
 	err := r.db.QueryRow(`
-		SELECT id, share_code, target_type, target_id, target_path, target_name, 
-			   password, expire_at, description, created_at, is_active, view_count, download_count
+		SELECT id, share_code, target_type, target_id, target_path, target_name,
+			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads
 		FROM shares WHERE id = ?
 	`, id).Scan(
 		&share.ID,
@@ -97,12 +104,16 @@ func (r *ShareRepository) GetByID(id int64) (*model.Share, error) {
 		&share.IsActive,
 		&share.ViewCount,
 		&share.DownloadCount,
+		&maxDownloads,
 	)
 	if err != nil {
 		return nil, err
 	}
 	if expireAt.Valid {
 		share.ExpireAt = &expireAt.Time
+	}
+	if maxDownloads.Valid {
+		share.MaxDownloads = maxDownloads.Int64
 	}
 	return &share, nil
 }
@@ -119,8 +130,8 @@ func (r *ShareRepository) List(page, pageSize int) ([]*model.Share, int64, error
 	// 获取分页数据
 	offset := (page - 1) * pageSize
 	rows, err := r.db.Query(`
-		SELECT id, share_code, target_type, target_id, target_path, target_name, 
-			   password, expire_at, description, created_at, is_active, view_count, download_count
+		SELECT id, share_code, target_type, target_id, target_path, target_name,
+			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads
 		FROM shares ORDER BY created_at DESC LIMIT ? OFFSET ?
 	`, pageSize, offset)
 	if err != nil {
@@ -132,6 +143,7 @@ func (r *ShareRepository) List(page, pageSize int) ([]*model.Share, int64, error
 	for rows.Next() {
 		var share model.Share
 		var expireAt sql.NullTime
+		var maxDownloads sql.NullInt64
 		err := rows.Scan(
 			&share.ID,
 			&share.ShareCode,
@@ -146,12 +158,16 @@ func (r *ShareRepository) List(page, pageSize int) ([]*model.Share, int64, error
 			&share.IsActive,
 			&share.ViewCount,
 			&share.DownloadCount,
+			&maxDownloads,
 		)
 		if err != nil {
 			return nil, 0, err
 		}
 		if expireAt.Valid {
 			share.ExpireAt = &expireAt.Time
+		}
+		if maxDownloads.Valid {
+			share.MaxDownloads = maxDownloads.Int64
 		}
 		shares = append(shares, &share)
 	}
@@ -161,12 +177,13 @@ func (r *ShareRepository) List(page, pageSize int) ([]*model.Share, int64, error
 // Update 更新分享
 func (r *ShareRepository) Update(share *model.Share) error {
 	_, err := r.db.Exec(`
-		UPDATE shares SET 
+		UPDATE shares SET
 			share_code = ?,
 			password = ?,
 			expire_at = ?,
 			description = ?,
-			is_active = ?
+			is_active = ?,
+			max_downloads = ?
 		WHERE id = ?
 	`,
 		share.ShareCode,
@@ -174,6 +191,7 @@ func (r *ShareRepository) Update(share *model.Share) error {
 		share.ExpireAt,
 		share.Description,
 		share.IsActive,
+		share.MaxDownloads,
 		share.ID,
 	)
 	return err

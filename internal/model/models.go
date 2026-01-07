@@ -77,6 +77,7 @@ type Share struct {
 	IsActive      bool       `json:"is_active"`
 	ViewCount     int64      `json:"view_count"`     // 访问次数
 	DownloadCount int64      `json:"download_count"` // 下载次数
+	MaxDownloads  int64      `json:"max_downloads"`  // 最大下载次数，0表示不限制
 }
 
 // AccessLog 访问日志
@@ -105,14 +106,15 @@ type FileInfo struct {
 
 // CreateShareRequest 创建分享请求
 type CreateShareRequest struct {
-	ShareCode   string `json:"share_code"`
-	TargetType  string `json:"target_type" binding:"required,oneof=file folder"`
-	TargetID    string `json:"target_id" binding:"required"`
-	TargetPath  string `json:"target_path"`
-	TargetName  string `json:"target_name" binding:"required"`
-	Password    string `json:"password"`
-	ExpireAt    string `json:"expire_at"` // ISO8601 格式
-	Description string `json:"description"`
+	ShareCode    string `json:"share_code"`
+	TargetType   string `json:"target_type" binding:"required,oneof=file folder"`
+	TargetID     string `json:"target_id" binding:"required"`
+	TargetPath   string `json:"target_path"`
+	TargetName   string `json:"target_name" binding:"required"`
+	Password     string `json:"password"`
+	ExpireAt     string `json:"expire_at"` // ISO8601 格式
+	Description  string `json:"description"`
+	MaxDownloads int64  `json:"max_downloads"` // 最大下载次数，0表示不限制
 }
 
 // LoginRequest 登录请求

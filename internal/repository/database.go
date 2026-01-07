@@ -128,6 +128,9 @@ func (d *Database) migrate() error {
 			consecutive_failures INTEGER DEFAULT 0
 		)`,
 		`INSERT OR IGNORE INTO monitor_status (id) VALUES (1)`,
+
+		// 下载次数限制字段
+		`ALTER TABLE shares ADD COLUMN max_downloads INTEGER DEFAULT 0`,
 	}
 
 	for _, migration := range migrations {

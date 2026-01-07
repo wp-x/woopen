@@ -55,9 +55,14 @@
              {{ row.expire_at ? formatDate(row.expire_at) : '永不过期' }}
           </template>
         </el-table-column>
-        <el-table-column label="访问/下载" width="100">
+        <el-table-column label="访问/下载" width="140">
           <template #default="{ row }">
-            <span style="font-family: monospace; font-weight: bold;">{{ row.view_count }} / {{ row.download_count }}</span>
+            <span style="font-family: monospace; font-weight: bold;">
+              {{ row.view_count }} / {{ row.download_count }}
+              <span v-if="row.max_downloads > 0" style="color: #909399;">
+                (限{{ row.max_downloads }}次)
+              </span>
+            </span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
@@ -118,6 +123,16 @@
             style="width: 100%"
           />
         </el-form-item>
+        <el-form-item label="下载次数">
+          <el-input-number
+            v-model="editForm.max_downloads"
+            :min="0"
+            :max="9999"
+            placeholder="0表示不限制"
+            style="width: 100%"
+          />
+          <div class="form-tip">设置为 0 表示不限制下载次数</div>
+        </el-form-item>
         <el-form-item label="备注">
           <el-input
             v-model="editForm.description"
@@ -173,6 +188,7 @@ interface Share {
   is_active: boolean
   view_count: number
   download_count: number
+  max_downloads: number
   created_at: string
 }
 
@@ -190,7 +206,8 @@ const editForm = ref({
   password: '',
   expire_at: null as Date | null,
   description: '',
-  is_active: true
+  is_active: true,
+  max_downloads: 0
 })
 
 // QR Code
@@ -234,7 +251,8 @@ function openEditDialog(share: Share) {
     password: share.password,
     expire_at: share.expire_at ? new Date(share.expire_at) : null,
     description: share.description,
-    is_active: share.is_active
+    is_active: share.is_active,
+    max_downloads: share.max_downloads || 0
   }
   editDialogVisible.value = true
 }
@@ -246,7 +264,8 @@ async function updateShare() {
       share_code: editForm.value.share_code,
       password: editForm.value.password,
       description: editForm.value.description,
-      is_active: editForm.value.is_active
+      is_active: editForm.value.is_active,
+      max_downloads: editForm.value.max_downloads
     }
     if (editForm.value.expire_at) {
       data.expire_at = editForm.value.expire_at.toISOString()
@@ -359,5 +378,11 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   justify-content: center;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 5px;
 }
 </style>

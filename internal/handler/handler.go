@@ -279,15 +279,16 @@ func (h *Handler) CreateShare(c *gin.Context) {
 	}
 
 	share := &model.Share{
-		ShareCode:   shareCode,
-		TargetType:  req.TargetType,
-		TargetID:    req.TargetID,
-		TargetPath:  req.TargetPath,
-		TargetName:  req.TargetName,
-		Password:    req.Password,
-		ExpireAt:    expireAt,
-		Description: req.Description,
-		IsActive:    true,
+		ShareCode:    shareCode,
+		TargetType:   req.TargetType,
+		TargetID:     req.TargetID,
+		TargetPath:   req.TargetPath,
+		TargetName:   req.TargetName,
+		Password:     req.Password,
+		ExpireAt:     expireAt,
+		Description:  req.Description,
+		IsActive:     true,
+		MaxDownloads: req.MaxDownloads,
 	}
 
 	if err := h.shareRepo.Create(share); err != nil {
@@ -345,11 +346,12 @@ func (h *Handler) UpdateShare(c *gin.Context) {
 	}
 
 	var req struct {
-		ShareCode   string `json:"share_code"`
-		Password    string `json:"password"`
-		ExpireAt    string `json:"expire_at"`
-		Description string `json:"description"`
-		IsActive    *bool  `json:"is_active"`
+		ShareCode    string `json:"share_code"`
+		Password     string `json:"password"`
+		ExpireAt     string `json:"expire_at"`
+		Description  string `json:"description"`
+		IsActive     *bool  `json:"is_active"`
+		MaxDownloads *int64 `json:"max_downloads"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.APIResponse{
@@ -375,6 +377,9 @@ func (h *Handler) UpdateShare(c *gin.Context) {
 	share.Description = req.Description
 	if req.IsActive != nil {
 		share.IsActive = *req.IsActive
+	}
+	if req.MaxDownloads != nil {
+		share.MaxDownloads = *req.MaxDownloads
 	}
 
 	if req.ExpireAt != "" {
@@ -465,14 +470,29 @@ func (h *Handler) AccessShare(c *gin.Context) {
 		Referer:   c.GetHeader("Referer"),
 	})
 
+	// 计算剩余下载次数
+	var remainingDownloads int64 = -1 // -1 表示不限制
+	downloadExhausted := false
+	if share.MaxDownloads > 0 {
+		remainingDownloads = share.MaxDownloads - share.DownloadCount
+		if remainingDownloads < 0 {
+			remainingDownloads = 0
+		}
+		downloadExhausted = share.DownloadCount >= share.MaxDownloads
+	}
+
 	c.JSON(http.StatusOK, model.APIResponse{
 		Code:    0,
 		Message: "success",
 		Data: gin.H{
-			"share_code":    share.ShareCode,
-			"target_type":   share.TargetType,
-			"target_name":   share.TargetName,
-			"need_password": needPassword,
+			"share_code":          share.ShareCode,
+			"target_type":         share.TargetType,
+			"target_name":         share.TargetName,
+			"need_password":       needPassword,
+			"max_downloads":       share.MaxDownloads,
+			"download_count":      share.DownloadCount,
+			"remaining_downloads": remainingDownloads,
+			"download_exhausted":  downloadExhausted,
 		},
 	})
 }
@@ -553,6 +573,15 @@ func (h *Handler) DownloadShare(c *gin.Context) {
 			})
 			return
 		}
+	}
+
+	// 检查下载次数限制
+	if share.MaxDownloads > 0 && share.DownloadCount >= share.MaxDownloads {
+		c.JSON(http.StatusForbidden, model.APIResponse{
+			Code:    403,
+			Message: "下载次数已达上限",
+		})
+		return
 	}
 
 	// 对于单文件分享，fileID可以为空，使用分享的target_id
@@ -916,15 +945,16 @@ func (h *Handler) BatchCreateShare(c *gin.Context) {
 		}
 
 		share := &model.Share{
-			ShareCode:   shareCode,
-			TargetType:  item.TargetType,
-			TargetID:    item.TargetID,
-			TargetPath:  item.TargetPath,
-			TargetName:  item.TargetName,
-			Password:    item.Password,
-			ExpireAt:    expireAt,
-			Description: item.Description,
-			IsActive:    true,
+			ShareCode:    shareCode,
+			TargetType:   item.TargetType,
+			TargetID:     item.TargetID,
+			TargetPath:   item.TargetPath,
+			TargetName:   item.TargetName,
+			Password:     item.Password,
+			ExpireAt:     expireAt,
+			Description:  item.Description,
+			IsActive:     true,
+			MaxDownloads: item.MaxDownloads,
 		}
 
 		if err := h.shareRepo.Create(share); err != nil {
@@ -1001,14 +1031,29 @@ func (h *Handler) GetShareFiles(c *gin.Context) {
 		return
 	}
 
+	// 计算剩余下载次数
+	var remainingDownloads int64 = -1 // -1 表示不限制
+	downloadExhausted := false
+	if share.MaxDownloads > 0 {
+		remainingDownloads = share.MaxDownloads - share.DownloadCount
+		if remainingDownloads < 0 {
+			remainingDownloads = 0
+		}
+		downloadExhausted = share.DownloadCount >= share.MaxDownloads
+	}
+
 	c.JSON(http.StatusOK, model.APIResponse{
 		Code:    0,
 		Message: "success",
 		Data: gin.H{
-			"files":      files,
-			"share_code": share.ShareCode,
-			"root_id":    share.TargetID,
-			"current_id": dirID,
+			"files":               files,
+			"share_code":          share.ShareCode,
+			"root_id":             share.TargetID,
+			"current_id":          dirID,
+			"max_downloads":       share.MaxDownloads,
+			"download_count":      share.DownloadCount,
+			"remaining_downloads": remainingDownloads,
+			"download_exhausted":  downloadExhausted,
 		},
 	})
 }
