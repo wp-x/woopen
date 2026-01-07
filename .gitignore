@@ -2,12 +2,12 @@
 woopen
 main
 test
+*.exe
 
 # Logs
 *.log
-web/frontend.log
 
-# Data
+# Data & Database
 data/
 *.db
 *.db-wal
@@ -15,16 +15,37 @@ data/
 
 # OS
 .DS_Store
+Thumbs.db
 
-# IDE
+# IDE & Editor
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 .cursorindexingignore
+
+# Development Tools
 .spec-workflow/
 .specstory/
-*.swp
+woopen-spec/
+
+# Development Documents (keep README.md)
+联通网盘的参数文档.md
+sdk_doc.txt
+*开发*.md
+*功能开发*.md
+*参数文档*.md
+
+# Reference Files (not needed for production)
+参考皮肤/
 
 # Frontend
 web/node_modules/
 web/dist/
 web/.vscode/
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
