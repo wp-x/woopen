@@ -17,11 +17,11 @@ type Config struct {
 // DefaultConfig 返回默认配置
 func DefaultConfig() *Config {
 	return &Config{
-		Port:          getEnv("WOOPEN_PORT", "8080"),
+		Port:          getEnv("WOOPEN_PORT", "10010"),
 		DataDir:       getEnv("WOOPEN_DATA_DIR", "./data"),
 		AdminPassword: getEnv("WOOPEN_ADMIN_PASSWORD", "admin123"),
 		JWTSecret:     getEnv("WOOPEN_JWT_SECRET", "woopen-secret-key-change-in-production"),
-		SiteURL:       getEnv("WOOPEN_SITE_URL", "http://localhost:8080"),
+		SiteURL:       getEnv("WOOPEN_SITE_URL", "http://localhost:10010"),
 	}
 }
 

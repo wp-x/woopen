@@ -5,7 +5,7 @@ services:
     build: .
     container_name: woopen
     ports:
-      - "8080:8080"
+      - "10010:10010"
     volumes:
       - ./data:/data
     environment:

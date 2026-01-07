@@ -1,6 +1,7 @@
 # Build stage - Go backend
-FROM golang:1.21-alpine AS backend-builder
+FROM golang:alpine AS backend-builder
 WORKDIR /app
+ENV GOTOOLCHAIN=auto
 RUN apk add --no-cache gcc musl-dev
 COPY go.mod go.sum ./
 RUN go mod download
@@ -28,9 +29,9 @@ COPY --from=frontend-builder /app/dist ./web/dist
 # Create data directory
 RUN mkdir -p /data
 
-EXPOSE 8080
+EXPOSE 10010
 
 ENV WOOPEN_DATA_DIR=/data
-ENV WOOPEN_PORT=8080
+ENV WOOPEN_PORT=10010
 
 CMD ["./woopen"]
