@@ -93,6 +93,41 @@ func (d *Database) migrate() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_share ON access_logs(share_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_time ON access_logs(accessed_at)`,
+
+		// 监控配置字段迁移
+		`ALTER TABLE settings ADD COLUMN monitor_enabled BOOLEAN DEFAULT 0`,
+		`ALTER TABLE settings ADD COLUMN monitor_interval INTEGER DEFAULT 300`,
+		// 多渠道通知配置
+		`ALTER TABLE settings ADD COLUMN notify_enabled BOOLEAN DEFAULT 0`,
+		`ALTER TABLE settings ADD COLUMN default_notify_channel TEXT DEFAULT 'bark'`,
+		`ALTER TABLE settings ADD COLUMN bark_url TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN serverchan_key TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN telegram_bot_token TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN telegram_chat_id TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN pushplus_token TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN dingtalk_webhook TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN wecom_webhook TEXT DEFAULT ''`,
+
+		// 通知记录表
+		`CREATE TABLE IF NOT EXISTS notification_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			event_type TEXT NOT NULL,
+			message TEXT NOT NULL,
+			status TEXT NOT NULL CHECK(status IN ('success', 'failed')),
+			error_msg TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_notification_time ON notification_logs(created_at)`,
+
+		// 监控状态表
+		`CREATE TABLE IF NOT EXISTS monitor_status (
+			id INTEGER PRIMARY KEY,
+			last_check_at DATETIME,
+			token_valid BOOLEAN DEFAULT 1,
+			last_error TEXT DEFAULT '',
+			consecutive_failures INTEGER DEFAULT 0
+		)`,
+		`INSERT OR IGNORE INTO monitor_status (id) VALUES (1)`,
 	}
 
 	for _, migration := range migrations {

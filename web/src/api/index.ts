@@ -104,6 +104,37 @@ export const settingsApi = {
         api.post('/settings/token/test', data)
 }
 
+// 监控API
+export const monitorApi = {
+    // 获取监控状态
+    getStatus: () => api.get('/monitor/status'),
+    // 立即执行检查
+    checkNow: () => api.post('/monitor/check'),
+    // 获取监控设置
+    getSettings: () => api.get('/monitor/settings'),
+    // 更新监控设置
+    updateSettings: (data: {
+        monitor_enabled?: boolean
+        monitor_interval?: number
+        notify_enabled?: boolean
+        default_notify_channel?: string
+        bark_url?: string
+        serverchan_key?: string
+        telegram_bot_token?: string
+        telegram_chat_id?: string
+        pushplus_token?: string
+        dingtalk_webhook?: string
+        wecom_webhook?: string
+    }) => api.put('/monitor/settings', data),
+    // 测试通知（所有已配置渠道）
+    testNotify: () => api.post('/monitor/notify/test'),
+    // 获取通知记录
+    getNotifications: (page = 1, pageSize = 20) =>
+        api.get('/monitor/notifications', { params: { page, page_size: pageSize } }),
+    // 清空通知记录
+    clearNotifications: () => api.delete('/monitor/notifications')
+}
+
 // 公开访问API（不需要认证）
 export const publicApi = {
     // 获取站点配置（公开）

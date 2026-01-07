@@ -30,20 +30,8 @@
         <div class="card-header">
           <div class="card-header-left">
             <span>文件列表</span>
-            <el-tag type="info" size="small" v-if="filteredFiles.length !== files.length">
-              {{ filteredFiles.length }} / {{ files.length }}
-            </el-tag>
           </div>
           <div class="card-header-right">
-            <!-- 搜索 -->
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索文件..."
-              size="small"
-              style="width: 200px"
-              clearable
-              :prefix-icon="Search"
-            />
             <!-- 排序 -->
             <el-dropdown @command="handleSort">
               <el-button size="small">
@@ -488,7 +476,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUIStore } from '../../stores/ui'
 
 import {
-  Refresh, Search, Grid, List,
+  Refresh, Grid, List,
   Picture, VideoPlay, Headset, Document as DocIcon,
   CopyDocument, TopRight
 } from '@element-plus/icons-vue'
@@ -516,7 +504,6 @@ const uiStore = useUIStore()
 const viewMode = ref<'list' | 'grid'>('list')
 const sortBy = ref<'name' | 'size' | 'time'>('name')
 const sortOrder = ref<'asc' | 'desc'>('asc')
-const searchKeyword = ref('') 
 
 // 键盘事件监听
 const handleKeydown = (e: KeyboardEvent) => {

@@ -28,6 +28,38 @@ type Settings struct {
 	LoginSystemName string `json:"login_system_name"` // 系统名称
 	// 分享页自定义
 	ShareFooter string `json:"share_footer"` // 分享页底部署名
+	// 监控配置
+	MonitorEnabled  bool `json:"monitor_enabled"`  // 是否启用监控
+	MonitorInterval int  `json:"monitor_interval"` // 监控间隔（秒）
+	// 多渠道通知配置
+	NotifyEnabled        bool   `json:"notify_enabled"`         // 是否启用通知
+	DefaultNotifyChannel string `json:"default_notify_channel"` // 默认通知渠道
+	BarkURL              string `json:"bark_url"`               // Bark 推送地址
+	ServerchanKey    string `json:"serverchan_key"`     // Server 酱 SendKey
+	TelegramBotToken string `json:"telegram_bot_token"` // Telegram Bot Token
+	TelegramChatID   string `json:"telegram_chat_id"`   // Telegram Chat ID
+	PushplusToken    string `json:"pushplus_token"`     // PushPlus Token
+	DingtalkWebhook  string `json:"dingtalk_webhook"`   // 钉钉 Webhook
+	WecomWebhook     string `json:"wecom_webhook"`      // 企业微信 Webhook
+}
+
+// MonitorStatus 监控状态
+type MonitorStatus struct {
+	ID                  int64     `json:"id"`
+	LastCheckAt         time.Time `json:"last_check_at"`
+	TokenValid          bool      `json:"token_valid"`
+	LastError           string    `json:"last_error"`
+	ConsecutiveFailures int       `json:"consecutive_failures"`
+}
+
+// NotificationLog 通知记录
+type NotificationLog struct {
+	ID        int64     `json:"id"`
+	EventType string    `json:"event_type"` // token_invalid, token_refresh, monitor_error
+	Message   string    `json:"message"`
+	Status    string    `json:"status"` // success, failed
+	ErrorMsg  string    `json:"error_msg"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Share 分享链接

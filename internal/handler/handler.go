@@ -23,13 +23,29 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// MonitorServiceInterface 监控服务接口
+type MonitorServiceInterface interface {
+	Start()
+	Stop()
+	IsRunning() bool
+	SetInterval(seconds int)
+	SetWopanClient(client *wopan.Client)
+	CheckNow() (*model.MonitorStatus, error)
+	GetStatus() (*model.MonitorStatus, error)
+	TestNotify() (map[string]string, error)
+	Reload() error
+}
+
 // Handler HTTP处理器
 type Handler struct {
-	settingsRepo  *repository.SettingsRepository
-	shareRepo     *repository.ShareRepository
-	accessLogRepo *repository.AccessLogRepository
-	wopanClient   *wopan.Client
-	adminPassword string
+	settingsRepo        *repository.SettingsRepository
+	shareRepo           *repository.ShareRepository
+	accessLogRepo       *repository.AccessLogRepository
+	monitorRepo         *repository.MonitorRepository
+	notificationLogRepo *repository.NotificationLogRepository
+	wopanClient         *wopan.Client
+	adminPassword       string
+	monitorService      MonitorServiceInterface
 }
 
 // NewHandler 创建Handler
@@ -37,16 +53,30 @@ func NewHandler(
 	settingsRepo *repository.SettingsRepository,
 	shareRepo *repository.ShareRepository,
 	accessLogRepo *repository.AccessLogRepository,
+	monitorRepo *repository.MonitorRepository,
+	notificationLogRepo *repository.NotificationLogRepository,
 	wopanClient *wopan.Client,
 	adminPassword string,
 ) *Handler {
 	return &Handler{
-		settingsRepo:  settingsRepo,
-		shareRepo:     shareRepo,
-		accessLogRepo: accessLogRepo,
-		wopanClient:   wopanClient,
-		adminPassword: adminPassword,
+		settingsRepo:        settingsRepo,
+		shareRepo:           shareRepo,
+		accessLogRepo:       accessLogRepo,
+		monitorRepo:         monitorRepo,
+		notificationLogRepo: notificationLogRepo,
+		wopanClient:         wopanClient,
+		adminPassword:       adminPassword,
 	}
+}
+
+// SetMonitorService 设置监控服务
+func (h *Handler) SetMonitorService(ms MonitorServiceInterface) {
+	h.monitorService = ms
+}
+
+// SetWopanClient 设置云盘客户端
+func (h *Handler) SetWopanClient(client *wopan.Client) {
+	h.wopanClient = client
 }
 
 // ===================== 公开配置 =====================
@@ -1187,4 +1217,257 @@ func getPreviewType(ext string) string {
 		return "pdf"
 	}
 	return "none"
+}
+
+// ===================== 监控相关 =====================
+
+// GetMonitorStatus 获取监控状态
+func (h *Handler) GetMonitorStatus(c *gin.Context) {
+	if h.monitorService == nil {
+		c.JSON(http.StatusServiceUnavailable, model.APIResponse{
+			Code:    503,
+			Message: "监控服务未初始化",
+		})
+		return
+	}
+
+	status, err := h.monitorService.GetStatus()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "获取监控状态失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "success",
+		Data: gin.H{
+			"status":  status,
+			"running": h.monitorService.IsRunning(),
+		},
+	})
+}
+
+// CheckMonitorNow 立即执行一次监控检查
+func (h *Handler) CheckMonitorNow(c *gin.Context) {
+	if h.monitorService == nil {
+		c.JSON(http.StatusServiceUnavailable, model.APIResponse{
+			Code:    503,
+			Message: "监控服务未初始化",
+		})
+		return
+	}
+
+	status, err := h.monitorService.CheckNow()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "执行检查失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "检查完成",
+		Data:    status,
+	})
+}
+
+// TestNotify 测试通知（所有已配置渠道）
+func (h *Handler) TestNotify(c *gin.Context) {
+	if h.monitorService == nil {
+		c.JSON(http.StatusServiceUnavailable, model.APIResponse{
+			Code:    503,
+			Message: "监控服务未初始化",
+		})
+		return
+	}
+
+	results, err := h.monitorService.TestNotify()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.APIResponse{
+			Code:    400,
+			Message: "测试失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "测试完成",
+		Data:    results,
+	})
+}
+
+// GetNotificationLogs 获取通知记录
+func (h *Handler) GetNotificationLogs(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	if h.notificationLogRepo == nil {
+		c.JSON(http.StatusServiceUnavailable, model.APIResponse{
+			Code:    503,
+			Message: "通知服务未初始化",
+		})
+		return
+	}
+
+	logs, total, err := h.notificationLogRepo.List(page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "获取通知记录失败",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "success",
+		Data: gin.H{
+			"logs":      logs,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		},
+	})
+}
+
+// UpdateMonitorSettings 更新监控设置
+func (h *Handler) UpdateMonitorSettings(c *gin.Context) {
+	var req struct {
+		MonitorEnabled   *bool  `json:"monitor_enabled"`
+		MonitorInterval  *int   `json:"monitor_interval"`
+		NotifyEnabled    *bool  `json:"notify_enabled"`
+		BarkURL          string `json:"bark_url"`
+		ServerchanKey    string `json:"serverchan_key"`
+		TelegramBotToken string `json:"telegram_bot_token"`
+		TelegramChatID   string `json:"telegram_chat_id"`
+		PushplusToken    string `json:"pushplus_token"`
+		DingtalkWebhook  string `json:"dingtalk_webhook"`
+		WecomWebhook     string `json:"wecom_webhook"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.APIResponse{
+			Code:    400,
+			Message: "请求参数错误",
+		})
+		return
+	}
+
+	settings, err := h.settingsRepo.Get()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "获取设置失败",
+		})
+		return
+	}
+
+	if req.MonitorEnabled != nil {
+		settings.MonitorEnabled = *req.MonitorEnabled
+	}
+	if req.MonitorInterval != nil {
+		if *req.MonitorInterval < 60 {
+			*req.MonitorInterval = 60 // 最小1分钟
+		}
+		settings.MonitorInterval = *req.MonitorInterval
+	}
+	if req.NotifyEnabled != nil {
+		settings.NotifyEnabled = *req.NotifyEnabled
+	}
+	// 通知渠道配置（允许设置为空以清除配置）
+	settings.BarkURL = req.BarkURL
+	settings.ServerchanKey = req.ServerchanKey
+	settings.TelegramBotToken = req.TelegramBotToken
+	settings.TelegramChatID = req.TelegramChatID
+	settings.PushplusToken = req.PushplusToken
+	settings.DingtalkWebhook = req.DingtalkWebhook
+	settings.WecomWebhook = req.WecomWebhook
+
+	if err := h.settingsRepo.Update(settings); err != nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "保存设置失败",
+		})
+		return
+	}
+
+	// 重新加载监控服务配置
+	if h.monitorService != nil {
+		h.monitorService.Reload()
+	}
+
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "监控设置已保存",
+	})
+}
+
+// ClearNotificationLogs 清空通知记录
+func (h *Handler) ClearNotificationLogs(c *gin.Context) {
+	if h.notificationLogRepo == nil {
+		c.JSON(http.StatusServiceUnavailable, model.APIResponse{
+			Code:    503,
+			Message: "通知服务未初始化",
+		})
+		return
+	}
+
+	// 只保留0条，即清空所有
+	if err := h.notificationLogRepo.CleanOldLogs(0); err != nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "清空失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "通知记录已清空",
+	})
+}
+
+// GetMonitorSettings 获取监控设置
+func (h *Handler) GetMonitorSettings(c *gin.Context) {
+	settings, err := h.settingsRepo.Get()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "获取设置失败",
+		})
+		return
+	}
+
+	// 敏感信息脱敏
+	maskString := func(s string) string {
+		if s == "" {
+			return ""
+		}
+		if len(s) <= 8 {
+			return "****"
+		}
+		return s[:4] + "****"
+	}
+
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "success",
+		Data: gin.H{
+			"monitor_enabled":    settings.MonitorEnabled,
+			"monitor_interval":   settings.MonitorInterval,
+			"notify_enabled":     settings.NotifyEnabled,
+			"bark_url":           maskString(settings.BarkURL),
+			"serverchan_key":     maskString(settings.ServerchanKey),
+			"telegram_bot_token": maskString(settings.TelegramBotToken),
+			"telegram_chat_id":   settings.TelegramChatID, // Chat ID 不脱敏
+			"pushplus_token":     maskString(settings.PushplusToken),
+			"dingtalk_webhook":   maskString(settings.DingtalkWebhook),
+			"wecom_webhook":      maskString(settings.WecomWebhook),
+		},
+	})
 }

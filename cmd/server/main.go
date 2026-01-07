@@ -11,6 +11,7 @@ import (
 	"woopen/internal/handler"
 	"woopen/internal/middleware"
 	"woopen/internal/repository"
+	"woopen/internal/service"
 	"woopen/internal/wopan"
 
 	"github.com/gin-gonic/gin"
@@ -37,12 +38,26 @@ func main() {
 	settingsRepo := repository.NewSettingsRepository(db.DB())
 	shareRepo := repository.NewShareRepository(db.DB())
 	accessLogRepo := repository.NewAccessLogRepository(db.DB())
+	monitorRepo := repository.NewMonitorRepository(db.DB())
+	notificationLogRepo := repository.NewNotificationLogRepository(db.DB())
 
 	// 初始化云盘客户端
 	wopanClient := initWopanClient(settingsRepo)
 
 	// 创建Handler
-	h := handler.NewHandler(settingsRepo, shareRepo, accessLogRepo, wopanClient, cfg.AdminPassword)
+	h := handler.NewHandler(settingsRepo, shareRepo, accessLogRepo, monitorRepo, notificationLogRepo, wopanClient, cfg.AdminPassword)
+
+	// 初始化监控服务
+	notifier := service.NewNotifier(notificationLogRepo)
+	monitorService := service.NewMonitorService(settingsRepo, monitorRepo, wopanClient, notifier)
+	h.SetMonitorService(monitorService)
+
+	// 根据配置决定是否启动监控
+	settings, _ := settingsRepo.Get()
+	if settings != nil && settings.MonitorEnabled {
+		monitorService.SetInterval(settings.MonitorInterval)
+		monitorService.Start()
+	}
 
 	// 设置Gin
 	gin.SetMode(gin.ReleaseMode)
@@ -154,6 +169,15 @@ func registerRoutes(r *gin.Engine, h *handler.Handler) {
 			auth.PUT("/settings", h.UpdateSettings)
 			auth.PUT("/settings/password", h.UpdatePassword)
 			auth.POST("/settings/token/test", h.TestToken)
+
+			// 监控
+			auth.GET("/monitor/status", h.GetMonitorStatus)
+			auth.POST("/monitor/check", h.CheckMonitorNow)
+			auth.GET("/monitor/settings", h.GetMonitorSettings)
+			auth.PUT("/monitor/settings", h.UpdateMonitorSettings)
+			auth.POST("/monitor/notify/test", h.TestNotify)
+			auth.GET("/monitor/notifications", h.GetNotificationLogs)
+			auth.DELETE("/monitor/notifications", h.ClearNotificationLogs)
 		}
 	}
 
