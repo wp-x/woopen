@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"woopen/internal/config"
 	"woopen/internal/handler"
@@ -118,12 +119,24 @@ func initWopanClient(settingsRepo *repository.SettingsRepository) *wopan.Client 
 
 // registerRoutes 注册路由
 func registerRoutes(r *gin.Engine, h *handler.Handler) {
+	distDir := filepath.Join(".", "web", "dist")
+	distExists := false
+	if _, err := os.Stat(distDir); err == nil {
+		distExists = true
+	}
+
 	// ==================== 公开API ====================
 	// 站点配置（公开）
 	r.GET("/api/site-config", h.GetSiteConfig)
 
 	// 分享访问
-	r.GET("/s/:code", h.AccessShare)
+	r.GET("/s/:code", func(c *gin.Context) {
+		if wantsHTML(c) {
+			serveIndex(c, distDir, distExists)
+			return
+		}
+		h.AccessShare(c)
+	})
 	r.POST("/s/:code/verify", h.VerifySharePassword)
 	r.GET("/s/:code/download", h.DownloadShare)
 	r.GET("/s/:code/download/:fileId", h.DownloadShare)
@@ -182,22 +195,27 @@ func registerRoutes(r *gin.Engine, h *handler.Handler) {
 	}
 
 	// ==================== 静态文件 ====================
-	// 检查是否存在 dist 目录
-	distDir := filepath.Join(".", "web", "dist")
-	if _, err := os.Stat(distDir); err == nil {
-		// 生产模式：使用编译好的前端
+	if distExists {
 		r.Static("/assets", filepath.Join(distDir, "assets"))
 		r.StaticFile("/favicon.ico", filepath.Join(distDir, "favicon.ico"))
-		r.NoRoute(func(c *gin.Context) {
-			c.File(filepath.Join(distDir, "index.html"))
-		})
-	} else {
-		// 开发模式: 返回简单的HTML
-		r.NoRoute(func(c *gin.Context) {
-			c.Header("Content-Type", "text/html")
-			c.String(http.StatusOK, devModeHTML())
-		})
 	}
+	r.NoRoute(func(c *gin.Context) {
+		serveIndex(c, distDir, distExists)
+	})
+}
+
+func wantsHTML(c *gin.Context) bool {
+	accept := c.GetHeader("Accept")
+	return strings.Contains(accept, "text/html") || strings.Contains(accept, "application/xhtml+xml")
+}
+
+func serveIndex(c *gin.Context, distDir string, distExists bool) {
+	if distExists {
+		c.File(filepath.Join(distDir, "index.html"))
+		return
+	}
+	c.Header("Content-Type", "text/html")
+	c.String(http.StatusOK, devModeHTML())
 }
 
 // devModeHTML 开发模式HTML

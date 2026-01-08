@@ -226,6 +226,17 @@
                  />
               </div>
            </div>
+
+           <div class="form-group">
+              <label class="brutal-label-tag">下载次数_LIMIT</label>
+              <input
+                v-model.number="shareForm.max_downloads"
+                class="brutal-input-reset"
+                type="number"
+                min="0"
+                placeholder="0 表示不限制"
+              >
+           </div>
            
            <div class="form-group">
               <label class="brutal-label-tag">备注信息_NOTE</label>
@@ -276,6 +287,17 @@
                    style="width: 100% !important; height: 42px;"
                  />
               </div>
+           </div>
+
+           <div class="form-group">
+              <label class="brutal-label-tag">统一下载次数_LIMIT</label>
+              <input
+                v-model.number="batchShareForm.max_downloads"
+                class="brutal-input-reset"
+                type="number"
+                min="0"
+                placeholder="0 表示不限制"
+              >
            </div>
            
            <div class="form-actions-brutal">
@@ -583,7 +605,8 @@ const shareForm = ref({
   share_code: '',
   password: '',
   expire_at: null as Date | null,
-  description: ''
+  description: '',
+  max_downloads: 0
 })
 
 // 批量分享
@@ -591,7 +614,8 @@ const batchShareDialogVisible = ref(false)
 const batchCreating = ref(false)
 const batchShareForm = ref({
   password: '',
-  expire_at: null as Date | null
+  expire_at: null as Date | null,
+  max_downloads: 0
 })
 const batchResultDialogVisible = ref(false)
 const batchResults = ref<any[]>([])
@@ -717,7 +741,8 @@ function openShareDialog(file: FileInfo) {
     share_code: '',
     password: '',
     expire_at: null,
-    description: ''
+    description: '',
+    max_downloads: 0
   }
   shareDialogVisible.value = true
 }
@@ -822,6 +847,9 @@ async function createShare() {
     if (shareForm.value.description) {
       data.description = shareForm.value.description
     }
+    if (typeof shareForm.value.max_downloads === 'number') {
+      data.max_downloads = shareForm.value.max_downloads > 0 ? shareForm.value.max_downloads : 0
+    }
 
     const res = await shareApi.create(data)
     
@@ -846,7 +874,8 @@ async function createShare() {
 function openBatchShareDialog() {
   batchShareForm.value = {
     password: '',
-    expire_at: null
+    expire_at: null,
+    max_downloads: 0
   }
   batchShareDialogVisible.value = true
 }
@@ -860,7 +889,8 @@ async function createBatchShare() {
       target_name: file.name,
       target_path: breadcrumbs.value.map(b => b.name).join('/') + '/' + file.name,
       password: batchShareForm.value.password || undefined,
-      expire_at: batchShareForm.value.expire_at?.toISOString()
+      expire_at: batchShareForm.value.expire_at?.toISOString(),
+      max_downloads: batchShareForm.value.max_downloads > 0 ? batchShareForm.value.max_downloads : 0
     }))
 
     const res = await shareApi.batchCreate(items)
