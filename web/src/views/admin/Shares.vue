@@ -65,7 +65,7 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <div class="row-actions">
                <el-button class="btn-brutal-icon" @click="showQRCode(row)">

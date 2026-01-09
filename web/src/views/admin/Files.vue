@@ -92,12 +92,12 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="大小" width="120">
+        <el-table-column label="大小" width="120" class-name="hide-on-mobile">
           <template #default="{ row }">
             {{ row.is_dir ? '-' : formatSize(row.size) }}
           </template>
         </el-table-column>
-        <el-table-column label="修改时间" width="200">
+        <el-table-column label="修改时间" width="200" class-name="hide-on-mobile">
           <template #default="{ row }">
             {{ formatDate(row.mod_time) }}
           </template>
@@ -1606,5 +1606,20 @@ onMounted(() => {
 .btn-icon-tiny:hover {
   background: var(--acid-green);
   color: black;
+}
+
+/* 响应式：768px 以下隐藏大小和修改时间列 */
+@media screen and (max-width: 768px) {
+  :deep(.el-table .hide-on-mobile) {
+    display: none !important;
+  }
+
+  /* 移动端文件名列获得更多空间 */
+  .file-name .name-text {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 </style>
