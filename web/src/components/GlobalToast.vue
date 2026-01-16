@@ -126,7 +126,49 @@ const uiStore = useUIStore()
     color: red; 
 }
 
-.toast-box.error .toast-bar { 
-    background: red; 
+.toast-box.error .toast-bar {
+    background: red;
+}
+
+/* 移动端响应式优化 */
+@media (max-width: 768px) {
+    .toast-container {
+        top: calc(20px + env(safe-area-inset-top, 0px));
+        left: 10px;
+        right: 10px;
+        transform: none;
+        width: auto;
+    }
+
+    .toast-box {
+        min-width: unset;
+        width: 100%;
+        box-shadow: 4px 4px 0 var(--pure-black, #000000);
+    }
+
+    .toast-content {
+        padding: 12px 15px;
+        gap: 10px;
+    }
+
+    .toast-icon {
+        font-size: 24px;
+    }
+
+    .toast-title {
+        font-size: 14px;
+    }
+
+    .toast-desc {
+        font-size: 11px;
+    }
+
+    .toast-close-btn {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 }
 </style>

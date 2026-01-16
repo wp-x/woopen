@@ -717,6 +717,76 @@ onMounted(() => {
   }
 }
 
+/* 移动端优化 */
+@media (max-width: 768px) {
+  .masonry-container {
+    column-count: 1;
+  }
+
+  /* 按钮优化 */
+  :deep(.el-button) {
+    box-shadow: 3px 3px 0 #000 !important;
+    padding: 10px 16px !important;
+    font-size: 12px !important;
+  }
+
+  :deep(.el-button:hover) {
+    box-shadow: 5px 5px 0 #000 !important;
+  }
+
+  :deep(.el-button--small) {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    box-shadow: 3px 3px 0 #000 !important;
+  }
+
+  /* 表单项优化 */
+  :deep(.el-form-item) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  :deep(.el-form-item__label) {
+    width: auto !important;
+    margin-bottom: 5px;
+    padding-right: 0 !important;
+  }
+
+  :deep(.el-form-item__content) {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  /* 表格优化 */
+  :deep(.el-table) {
+    font-size: 12px;
+  }
+
+  :deep(.el-table .el-table__cell) {
+    padding: 8px 4px;
+  }
+
+  /* 隐藏错误信息列（第5列） */
+  :deep(.el-table th:nth-child(5)),
+  :deep(.el-table td:nth-child(5)) {
+    display: none;
+  }
+
+  /* 输入框优化 */
+  :deep(.el-input__wrapper) {
+    box-shadow: 3px 3px 0 #ccc !important;
+  }
+
+  :deep(.el-select .el-input__wrapper) {
+    box-shadow: 3px 3px 0 #000 !important;
+  }
+
+  /* 卡片优化 */
+  :deep(.el-card) {
+    box-shadow: 3px 3px 0 #000;
+  }
+}
+
 /* ========================================
    新粗犷主义按钮样式 - NEO BRUTALISM
    ======================================== */

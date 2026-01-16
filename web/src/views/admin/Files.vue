@@ -1614,12 +1614,152 @@ onMounted(() => {
     display: none !important;
   }
 
-  /* 移动端文件名列获得更多空间 */
+  /* 面包屑和头部优化 */
+  .breadcrumb-row {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .breadcrumb-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .card-header-right {
+    width: 100%;
+  }
+
+  /* 文件名和操作列优化 */
   .file-name .name-text {
-    max-width: 180px;
+    max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  :deep(.el-table-column--fixed-right) {
+    width: auto !important;
+    min-width: 100px !important;
+  }
+
+  .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .btn-brutal-icon,
+  :deep(.btn-brutal-icon) {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 !important;
+  }
+
+  /* 弹窗优化 */
+  .preview-overlay .window-frame {
+    width: 100% !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 10px;
+  }
+
+  .brutal-form-content {
+    padding: 15px;
+  }
+
+  .form-group {
+    margin-bottom: 15px;
+  }
+
+  .brutal-label-tag {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .brutal-input-reset {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .form-actions-brutal {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn-cancel,
+  .btn-confirm {
+    width: 100%;
+    flex: unset;
+  }
+
+  /* 批量结果列表优化 */
+  .batch-result-header {
+    font-size: 10px;
+    padding: 6px;
+  }
+
+  .batch-result-row {
+    flex-wrap: wrap;
+    padding: 8px;
+  }
+
+  .res-name {
+    width: 100%;
+    margin-bottom: 4px;
+  }
+
+  .res-link {
+    font-size: 11px;
+  }
+
+  /* 网格视图优化 */
+  .grid-view {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+  }
+
+  .grid-item {
+    padding: 10px;
+  }
+
+  .grid-name {
+    font-size: 11px;
+  }
+
+  /* 预览弹窗优化 */
+  .brutal-video {
+    max-height: 50vh;
+  }
+
+  .preview-img {
+    max-height: 50vh;
+  }
+
+  .file-info-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .file-info-bar .file-info-item:nth-child(3) {
+    display: none;
+  }
+
+  .window-header {
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+
+  .window-controls button {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 </style>

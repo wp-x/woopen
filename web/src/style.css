@@ -453,3 +453,132 @@ body {
   gap: 8px;
   align-items: center;
 }
+
+/* ====================
+   移动端全局样式优化
+   ==================== */
+
+/* 安全区域 CSS 变量 */
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 移动端基础优化 */
+@media (max-width: 768px) {
+  body {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 触摸友好 - 最小触摸区域 */
+  button,
+  .el-button,
+  [role="button"] {
+    min-height: 36px;
+  }
+
+  /* 窗口控制按钮特殊处理 */
+  .window-controls button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  /* 阴影缩小 */
+  .window-frame {
+    box-shadow: 4px 4px 0px var(--pure-black);
+  }
+
+  .el-card {
+    box-shadow: 3px 3px 0 var(--pure-black) !important;
+  }
+
+  /* 隐藏滚动条 */
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  /* Element Plus Dialog 优化 */
+  .el-dialog {
+    width: 95vw !important;
+    margin: 10px auto !important;
+  }
+
+  .el-dialog__body {
+    padding: 15px !important;
+  }
+
+  /* Element Plus Table 优化 */
+  .el-table {
+    font-size: 12px;
+  }
+
+  .el-table td.el-table__cell,
+  .el-table th.el-table__cell {
+    padding: 8px 4px !important;
+  }
+
+  /* Element Plus 日期选择器和下拉框优化 */
+  .el-date-editor,
+  .el-select {
+    width: 100% !important;
+  }
+
+  /* 按钮样式优化 */
+  .btn-brutal {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+
+  .btn-brutal-small {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    box-shadow: 2px 2px 0 var(--pure-black);
+  }
+
+  .btn-brutal-icon {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* 窗口头部优化 */
+  .window-header {
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+
+  /* 输入框优化 */
+  .brutal-input {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
+
+/* 超小屏幕优化 (375px 及以下) */
+@media (max-width: 375px) {
+  .window-header {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .btn-brutal {
+    padding: 12px 15px;
+    font-size: 14px;
+  }
+
+  .el-button {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+  }
+
+  .el-card__header {
+    padding: 12px !important;
+  }
+
+  .el-card__body {
+    padding: 12px !important;
+  }
+}

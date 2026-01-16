@@ -882,34 +882,119 @@ onUnmounted(() => {
 
 /* Mobile */
 @media (max-width: 768px) {
-    .huge-window, .compact-window {
+    /* 页面容器优化 */
+    .share-page-wrapper {
+        padding: 10px;
+        padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    }
+
+    .huge-window, .compact-window, .centered-window {
         width: 100%;
+        max-height: 95vh;
+    }
+
+    .huge-window {
         height: auto;
+        max-height: 90vh;
     }
-    
-    .centered-window {
+
+    /* 工具栏优化 */
+    .brutal-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .nav-breadcrumbs {
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .toolbar-actions {
         width: 100%;
+        flex-wrap: wrap;
     }
-    
+
+    .mini-input {
+        flex: 1;
+        min-width: 120px;
+    }
+
+    /* 文件列表优化 */
+    .file-header-row {
+        font-size: 11px;
+        padding: 8px;
+    }
+
+    .file-header-row span:nth-child(2) {
+        display: none;
+    }
+
+    .file-item {
+        padding: 12px 8px;
+        font-size: 12px;
+    }
+
+    .file-item span:nth-child(2) {
+        display: none;
+    }
+
+    .txt-btn {
+        padding: 8px;
+        font-size: 11px;
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* 网格视图优化 */
+    .grid-view-brutal {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
+    }
+
+    .grid-item-brutal {
+        padding: 8px;
+    }
+
+    .grid-name {
+        font-size: 11px;
+    }
+
+    /* 单文件操作优化 */
+    .file-action-buttons {
+        flex-direction: column;
+    }
+
+    .primary-action,
+    .secondary-action {
+        width: 100%;
+        padding: 15px;
+    }
+
+    /* 文件头部优化 */
     .file-header-brutal {
         flex-direction: column;
         text-align: center;
     }
-    
+
     .file-icon-box {
         margin: 0 0 10px 0;
     }
-    
-    .toolbar-actions {
-        width: 100%;
+
+    .file-title {
+        font-size: 18px;
     }
-    
-    .mini-input {
-        flex: 1;
+
+    /* 窗口头部优化 */
+    .window-header {
+        font-size: 14px;
+        padding: 8px 12px;
     }
-    
-    .file-item span:nth-child(2) {
-        display: none;
+
+    .window-controls button {
+        min-width: 44px;
+        min-height: 44px;
     }
 }
 
@@ -1001,4 +1086,35 @@ onUnmounted(() => {
     text-align: center;
 }
 .file-info-item span { color: var(--acid-green, #ccff00); display: block; font-weight: bold; }
+
+/* 预览弹窗移动端优化 */
+@media (max-width: 768px) {
+    .preview-overlay .window-frame {
+        width: 100% !important;
+        max-width: calc(100vw - 20px) !important;
+        min-width: unset !important;
+        margin: 10px;
+    }
+
+    .brutal-video {
+        max-height: 50vh;
+    }
+
+    .preview-img {
+        max-height: 50vh;
+    }
+
+    .file-info-bar {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .file-info-bar .file-info-item:nth-child(3) {
+        display: none;
+    }
+
+    .image-stage {
+        min-height: 200px;
+        padding: 10px;
+    }
+}
 </style>
