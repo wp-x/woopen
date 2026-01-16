@@ -882,20 +882,25 @@ onUnmounted(() => {
 
 /* Mobile */
 @media (max-width: 768px) {
-    /* 页面容器优化 */
+    /* 页面容器优化 - 固定一屏居中 */
     .share-page-wrapper {
         padding: 10px;
         padding-top: calc(10px + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        min-height: 100dvh;
+        height: 100dvh;
+        overflow: hidden;
+        box-sizing: border-box;
     }
 
     .huge-window, .compact-window, .centered-window {
         width: 100%;
-        max-height: 95vh;
+        max-height: calc(100dvh - 20px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+        overflow-y: auto;
     }
 
     .huge-window {
         height: auto;
-        max-height: 90vh;
     }
 
     /* 工具栏优化 */
