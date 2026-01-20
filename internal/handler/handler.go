@@ -1424,14 +1424,28 @@ func (h *Handler) UpdateMonitorSettings(c *gin.Context) {
 	if req.NotifyEnabled != nil {
 		settings.NotifyEnabled = *req.NotifyEnabled
 	}
-	// 通知渠道配置（允许设置为空以清除配置）
-	settings.BarkURL = req.BarkURL
-	settings.ServerchanKey = req.ServerchanKey
-	settings.TelegramBotToken = req.TelegramBotToken
-	settings.TelegramChatID = req.TelegramChatID
-	settings.PushplusToken = req.PushplusToken
-	settings.DingtalkWebhook = req.DingtalkWebhook
-	settings.WecomWebhook = req.WecomWebhook
+	// 通知渠道配置（只有传入非空值时才更新，空字符串表示保持原值）
+	if req.BarkURL != "" {
+		settings.BarkURL = req.BarkURL
+	}
+	if req.ServerchanKey != "" {
+		settings.ServerchanKey = req.ServerchanKey
+	}
+	if req.TelegramBotToken != "" {
+		settings.TelegramBotToken = req.TelegramBotToken
+	}
+	if req.TelegramChatID != "" {
+		settings.TelegramChatID = req.TelegramChatID
+	}
+	if req.PushplusToken != "" {
+		settings.PushplusToken = req.PushplusToken
+	}
+	if req.DingtalkWebhook != "" {
+		settings.DingtalkWebhook = req.DingtalkWebhook
+	}
+	if req.WecomWebhook != "" {
+		settings.WecomWebhook = req.WecomWebhook
+	}
 
 	if err := h.settingsRepo.Update(settings); err != nil {
 		c.JSON(http.StatusInternalServerError, model.APIResponse{
