@@ -97,8 +97,8 @@ func (c *Client) Init() error {
 
 // ListFiles 获取文件列表（个人云）
 func (c *Client) ListFiles(dirID string, page, pageSize int) ([]*model.FileInfo, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if c.client == nil {
 		return nil, fmt.Errorf("客户端未初始化")
@@ -120,6 +120,20 @@ func (c *Client) ListFiles(dirID string, page, pageSize int) ([]*model.FileInfo,
 	if pageNum < 0 {
 		pageNum = 0
 	}
+
+	files, err := c.listFilesLocked(dirID, pageNum, pageSize)
+	if err != nil && isLoginFailed(err) {
+		// Token 过期，尝试刷新后重试
+		if refreshErr := c.client.RefreshToken(); refreshErr != nil {
+			return nil, fmt.Errorf("刷新Token失败: %w", refreshErr)
+		}
+		files, err = c.listFilesLocked(dirID, pageNum, pageSize)
+	}
+	return files, err
+}
+
+// listFilesLocked 内部获取文件列表（需要持有锁）
+func (c *Client) listFilesLocked(dirID string, pageNum, pageSize int) ([]*model.FileInfo, error) {
 	data, err := c.client.QueryAllFilesPersonal(
 		dirID,
 		pageNum,
