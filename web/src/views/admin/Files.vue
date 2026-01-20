@@ -563,12 +563,6 @@ onUnmounted(() => {
   stopVideoTimer()
 })
 
-const sortLabels: Record<string, string> = {
-  name: '名称',
-  size: '大小',
-  time: '时间'
-}
-
 // 过滤和排序后的文件列表
 const filteredFiles = computed(() => {
   let result = [...files.value]
