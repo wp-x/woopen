@@ -32,21 +32,6 @@
             <span>文件列表</span>
           </div>
           <div class="card-header-right">
-            <!-- 排序 -->
-            <el-dropdown @command="handleSort">
-              <el-button size="small">
-                <el-icon><Sort /></el-icon>
-                {{ sortLabels[sortBy] }}
-                <el-icon :class="{ 'rotate-180': sortOrder === 'desc' }"><ArrowDown /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="name">按名称</el-dropdown-item>
-                  <el-dropdown-item command="size">按大小</el-dropdown-item>
-                  <el-dropdown-item command="time">按时间</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
             <!-- 视图切换 -->
             <el-button-group>
               <el-button
@@ -81,7 +66,15 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column label="名称" min-width="300">
+        <el-table-column min-width="300">
+          <template #header>
+            <div class="sortable-header" @click="handleSort('name')">
+              <span>名称</span>
+              <el-icon v-if="sortBy === 'name'" :class="{ 'rotate-180': sortOrder === 'desc' }">
+                <ArrowUp />
+              </el-icon>
+            </div>
+          </template>
           <template #default="{ row }">
             <div class="file-name" @click="handleRowClick(row)">
               <el-icon :size="24" color="var(--pure-black)" class="file-icon-brutal">
@@ -92,12 +85,28 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="大小" width="120" class-name="hide-on-mobile">
+        <el-table-column width="120" class-name="hide-on-mobile">
+          <template #header>
+            <div class="sortable-header" @click="handleSort('size')">
+              <span>大小</span>
+              <el-icon v-if="sortBy === 'size'" :class="{ 'rotate-180': sortOrder === 'desc' }">
+                <ArrowUp />
+              </el-icon>
+            </div>
+          </template>
           <template #default="{ row }">
             {{ row.is_dir ? '-' : formatSize(row.size) }}
           </template>
         </el-table-column>
-        <el-table-column label="修改时间" width="200" class-name="hide-on-mobile">
+        <el-table-column width="200" class-name="hide-on-mobile">
+          <template #header>
+            <div class="sortable-header" @click="handleSort('time')">
+              <span>修改时间</span>
+              <el-icon v-if="sortBy === 'time'" :class="{ 'rotate-180': sortOrder === 'desc' }">
+                <ArrowUp />
+              </el-icon>
+            </div>
+          </template>
           <template #default="{ row }">
             {{ formatDate(row.mod_time) }}
           </template>
@@ -500,7 +509,8 @@ import { useUIStore } from '../../stores/ui'
 import {
   Refresh, Grid, List,
   Picture, VideoPlay, Headset, Document as DocIcon,
-  CopyDocument, TopRight
+  CopyDocument, TopRight, ArrowUp,
+  HomeFilled, Folder, Share, View, Download
 } from '@element-plus/icons-vue'
 import { fileApi, shareApi } from '../../api'
 
@@ -524,8 +534,8 @@ const uiStore = useUIStore()
 
 // 视图和排序
 const viewMode = ref<'list' | 'grid'>('list')
-const sortBy = ref<'name' | 'size' | 'time'>('name')
-const sortOrder = ref<'asc' | 'desc'>('asc')
+const sortBy = ref<'name' | 'size' | 'time'>('time')
+const sortOrder = ref<'asc' | 'desc'>('desc')
 
 // 键盘事件监听
 const handleKeydown = (e: KeyboardEvent) => {
@@ -1419,6 +1429,22 @@ onMounted(() => {
 .grid-item:hover .grid-actions {
   opacity: 1;
   bottom: 8px;
+}
+
+.sortable-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable-header:hover {
+  color: var(--el-color-primary);
+}
+
+.sortable-header .el-icon {
+  transition: transform 0.2s;
 }
 
 .rotate-180 {
