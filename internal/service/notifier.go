@@ -143,6 +143,10 @@ func (n *Notifier) TestAll(config NotifyConfig) (results map[string]string) {
 // sendBark Bark 推送 (iOS)
 func (n *Notifier) sendBark(barkURL, title, message string) error {
 	// Bark URL 格式: https://api.day.app/xxxxx
+	// 如果只提供了 token，自动补全为完整 URL
+	if !strings.HasPrefix(barkURL, "http://") && !strings.HasPrefix(barkURL, "https://") {
+		barkURL = "https://api.day.app/" + barkURL
+	}
 	// 去掉末尾的斜杠
 	barkURL = strings.TrimSuffix(barkURL, "/")
 
