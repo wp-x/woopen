@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"image/png"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -872,10 +873,68 @@ func (h *Handler) TestToken(c *gin.Context) {
 		return
 	}
 
+	// 使用实际的 API 调用来验证 Token（带重试机制）
+	if err := h.validateTokenWithRetry(client); err != nil {
+		c.JSON(http.StatusBadRequest, model.APIResponse{
+			Code:    400,
+			Message: "Token验证失败: " + err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, model.APIResponse{
 		Code:    0,
-		Message: "Token有效",
+		Message: "Token有效，连接成功",
 	})
+}
+
+// validateTokenWithRetry 验证 Token 有效性（带重试机制）
+func (h *Handler) validateTokenWithRetry(client *wopan.Client) error {
+	maxRetries := 2
+	retryDelay := 2 * time.Second
+
+	for i := 0; i <= maxRetries; i++ {
+		if i > 0 {
+			log.Printf("[TestToken] 重试 %d/%d\n", i, maxRetries)
+			time.Sleep(retryDelay)
+		}
+
+		// 使用轻量级的文件列表查询来验证 Token
+		_, err := client.ListFiles("0", 1, 1)
+
+		if err == nil {
+			// 验证成功
+			return nil
+		}
+
+		// 判断是否为真正的 Token 失效错误
+		if isTokenInvalidError(err) {
+			// 确认是 Token 失效，不再重试
+			return err
+		}
+
+		// 其他错误（如网络问题、临时限流等），继续重试
+		log.Printf("[TestToken] 遇到临时错误: %v\n", err)
+	}
+
+	// 重试后仍然失败，返回最后一次错误
+	_, lastErr := client.ListFiles("0", 1, 1)
+	return lastErr
+}
+
+// isTokenInvalidError 判断是否为 Token 失效错误
+func isTokenInvalidError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	// 只有明确的 Token 失效错误码才判定为失效
+	return strings.Contains(msg, "rsp_code: 8005") ||
+		strings.Contains(msg, "rsp_code: 1001") ||
+		strings.Contains(msg, "登录失败") ||
+		strings.Contains(msg, "无效的令牌") ||
+		strings.Contains(msg, "token已过期") ||
+		strings.Contains(msg, "token invalid")
 }
 
 // containsMask 检查字符串是否包含掩码

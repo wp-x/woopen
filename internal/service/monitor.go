@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 	"woopen/internal/model"
@@ -139,8 +140,8 @@ func (m *MonitorService) check() {
 		status = &model.MonitorStatus{}
 	}
 
-	// 尝试通过 SDK 验证 Token（尝试获取文件列表来验证）
-	_, checkErr := client.ListFiles("0", 1, 1)
+	// 使用轻量级检测方式，带重试机制
+	checkErr := m.validateToken(client)
 
 	now := time.Now()
 	status.LastCheckAt = now
@@ -165,8 +166,9 @@ func (m *MonitorService) check() {
 
 		log.Printf("[Monitor] Token 检查失败 (连续 %d 次): %v\n", status.ConsecutiveFailures, checkErr)
 
-		// 只在首次失败或间隔超过1小时时发送通知，避免重复通知
-		if settings.NotifyEnabled && (status.ConsecutiveFailures == 1 || time.Since(m.lastNotified) > time.Hour) {
+		// 只在连续失败3次以上才判定为真正失效，避免临时性错误误报
+		// 并且间隔超过1小时才发送通知，避免重复通知
+		if settings.NotifyEnabled && status.ConsecutiveFailures >= 3 && time.Since(m.lastNotified) > time.Hour {
 			m.notifier.NotifyTokenInvalid(notifyConfig, checkErr.Error())
 			m.lastNotified = now
 		}
@@ -191,6 +193,56 @@ func (m *MonitorService) check() {
 	if err := m.monitorRepo.UpdateStatus(status); err != nil {
 		log.Printf("[Monitor] 更新监控状态失败: %v\n", err)
 	}
+}
+
+// validateToken 验证 Token 有效性（带重试机制）
+func (m *MonitorService) validateToken(client *wopan.Client) error {
+	maxRetries := 2
+	retryDelay := 2 * time.Second
+
+	for i := 0; i <= maxRetries; i++ {
+		if i > 0 {
+			log.Printf("[Monitor] Token 检查重试 %d/%d\n", i, maxRetries)
+			time.Sleep(retryDelay)
+		}
+
+		// 使用轻量级的文件列表查询来验证 Token
+		// 只获取1个文件，减少 API 负担
+		_, err := client.ListFiles("0", 1, 1)
+
+		if err == nil {
+			// 检查成功
+			return nil
+		}
+
+		// 判断是否为真正的 Token 失效错误
+		if isTokenInvalidError(err) {
+			// 确认是 Token 失效，不再重试
+			return err
+		}
+
+		// 其他错误（如网络问题、临时限流等），继续重试
+		log.Printf("[Monitor] 检查遇到临时错误: %v\n", err)
+	}
+
+	// 重试后仍然失败，但不是 Token 失效错误，返回最后一次错误
+	_, lastErr := client.ListFiles("0", 1, 1)
+	return lastErr
+}
+
+// isTokenInvalidError 判断是否为 Token 失效错误
+func isTokenInvalidError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	// 只有明确的 Token 失效错误码才判定为失效
+	return strings.Contains(msg, "rsp_code: 8005") ||
+		strings.Contains(msg, "rsp_code: 1001") ||
+		strings.Contains(msg, "登录失败") ||
+		strings.Contains(msg, "无效的令牌") ||
+		strings.Contains(msg, "token已过期") ||
+		strings.Contains(msg, "token invalid")
 }
 
 // CheckNow 立即执行一次检查
