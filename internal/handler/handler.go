@@ -805,6 +805,9 @@ func (h *Handler) reinitWopanClient(settings *model.Settings) {
 		return
 	}
 	h.wopanClient = client
+	if h.monitorService != nil {
+		h.monitorService.SetWopanClient(client)
+	}
 }
 
 // UpdatePassword 修改管理员密码
