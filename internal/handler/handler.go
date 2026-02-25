@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"woopen/internal/middleware"
 	"woopen/internal/model"
@@ -47,6 +48,10 @@ type Handler struct {
 	wopanClient         *wopan.Client
 	adminPassword       string
 	monitorService      MonitorServiceInterface
+
+	// uploadProgress holds best-effort server-side upload progress keyed by upload_id.
+	// Used by the admin UI polling endpoint to show real progress during Upload2C.
+	uploadProgress sync.Map
 }
 
 // NewHandler 创建Handler
@@ -86,6 +91,7 @@ func (h *Handler) SetWopanClient(client *wopan.Client) {
 func (h *Handler) GetSiteConfig(c *gin.Context) {
 	settings, err := h.settingsRepo.Get()
 	if err != nil {
+		baseURL := requestBaseURL(c)
 		// 返回默认值
 		c.JSON(http.StatusOK, model.APIResponse{
 			Code:    0,
@@ -98,11 +104,15 @@ func (h *Handler) GetSiteConfig(c *gin.Context) {
 				"login_level_tag":   "LEVEL: 99",
 				"login_system_name": "WOOPEN CLOUD SYSTEM",
 				"share_footer":      "Powered by WOOPEN_OS // BRUTAL_EDITION",
+				// For copy/paste (WebDAV mount, share links, etc.). Prefer reverse-proxy headers.
+				"site_url":   baseURL,
+				"webdav_url": baseURL + "/dav/",
 			},
 		})
 		return
 	}
 
+	baseURL := requestBaseURL(c)
 	c.JSON(http.StatusOK, model.APIResponse{
 		Code:    0,
 		Message: "success",
@@ -114,6 +124,8 @@ func (h *Handler) GetSiteConfig(c *gin.Context) {
 			"login_level_tag":   settings.LoginLevelTag,
 			"login_system_name": settings.LoginSystemName,
 			"share_footer":      settings.ShareFooter,
+			"site_url":          baseURL,
+			"webdav_url":        baseURL + "/dav/",
 		},
 	})
 }
@@ -231,6 +243,125 @@ func (h *Handler) GetFileLink(c *gin.Context) {
 		Data: gin.H{
 			"url": downloadURL,
 		},
+	})
+}
+
+// UploadFile 上传文件
+func (h *Handler) UploadFile(c *gin.Context) {
+	if !h.wopanClient.IsInitialized() {
+		c.JSON(http.StatusServiceUnavailable, model.APIResponse{
+			Code:    503,
+			Message: "云盘客户端未初始化，请先配置Token",
+		})
+		return
+	}
+
+	// 获取父目录ID
+	parentID := c.PostForm("parent_id")
+
+	// upload_id 由前端生成并随表单上传，用于轮询进度；为空时服务端兜底生成。
+	uploadID := c.PostForm("upload_id")
+	if uploadID == "" {
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err == nil {
+			uploadID = hex.EncodeToString(b)
+		} else {
+			// 极端情况下兜底，避免空 key 覆盖。
+			uploadID = fmt.Sprintf("u_%d", time.Now().UnixNano())
+		}
+	}
+
+	// 获取上传的文件
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.APIResponse{
+			Code:    400,
+			Message: "获取上传文件失败: " + err.Error(),
+		})
+		return
+	}
+	defer file.Close()
+
+	// 初始化进度条目（best-effort：仅内存态）
+	entry := &uploadProgressEntry{}
+	entry.setUploading(header.Filename, parentID, header.Size)
+	h.uploadProgress.Store(uploadID, entry)
+
+	// 上传文件
+	fileInfo, err := h.wopanClient.UploadFile(
+		c.Request.Context(),
+		parentID,
+		header.Filename,
+		header.Header.Get("Content-Type"),
+		header.Size,
+		file,
+		func(uploaded, total int64) {
+			entry.setProgress(uploaded, total)
+		},
+	)
+	if err != nil {
+		entry.setDone("failed", err)
+		// 避免 map 长期增长：失败后短暂保留，便于前端拿到错误信息。
+		time.AfterFunc(2*time.Minute, func() {
+			h.uploadProgress.Delete(uploadID)
+		})
+
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "上传文件失败: " + err.Error(),
+		})
+		return
+	}
+
+	entry.setDone("success", nil)
+	time.AfterFunc(2*time.Minute, func() {
+		h.uploadProgress.Delete(uploadID)
+	})
+
+	c.Header("X-Upload-Id", uploadID)
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "上传成功",
+		Data:    fileInfo,
+	})
+}
+
+// CreateDirectory 创建目录
+func (h *Handler) CreateDirectory(c *gin.Context) {
+	if !h.wopanClient.IsInitialized() {
+		c.JSON(http.StatusServiceUnavailable, model.APIResponse{
+			Code:    503,
+			Message: "云盘客户端未初始化，请先配置Token",
+		})
+		return
+	}
+
+	var req struct {
+		ParentID string `json:"parent_id"`
+		Name     string `json:"name" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.APIResponse{
+			Code:    400,
+			Message: "参数错误: " + err.Error(),
+		})
+		return
+	}
+
+	fileInfo, err := h.wopanClient.CreateDirectory(req.ParentID, req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "创建目录失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.APIResponse{
+		Code:    0,
+		Message: "创建成功",
+		Data:    fileInfo,
 	})
 }
 
@@ -720,20 +851,9 @@ func maskedAccessToken(token string) string {
 
 // UpdateSettings 更新设置
 func (h *Handler) UpdateSettings(c *gin.Context) {
-	var req struct {
-		RefreshToken    string `json:"refresh_token"`
-		AccessToken     string `json:"access_token"`
-		RootFolderID    string `json:"root_folder_id"`
-		SiteTitle       string `json:"site_title"`
-		SiteLogo        string `json:"site_logo"`
-		LoginTitle      string `json:"login_title"`
-		LoginAvatar     string `json:"login_avatar"`
-		LoginRoleTag    string `json:"login_role_tag"`
-		LoginLevelTag   string `json:"login_level_tag"`
-		LoginSystemName string `json:"login_system_name"`
-		ShareFooter     string `json:"share_footer"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// 使用 map 解析请求，区分"未传字段"和"传了空字符串"
+	var raw map[string]interface{}
+	if err := c.ShouldBindJSON(&raw); err != nil {
 		c.JSON(http.StatusBadRequest, model.APIResponse{
 			Code:    400,
 			Message: "请求参数错误",
@@ -741,35 +861,61 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	settings, _ := h.settingsRepo.Get()
+	settings, err := h.settingsRepo.Get()
+	if err != nil || settings == nil {
+		c.JSON(http.StatusInternalServerError, model.APIResponse{
+			Code:    500,
+			Message: "获取设置失败",
+		})
+		return
+	}
 
-	// 只有当新Token不为空且不是掩码时才更新
+	// Token 更新逻辑
 	tokenChanged := false
 	refreshTokenChanged := false
 	accessTokenChanged := false
-	if req.RefreshToken != "" && !containsMask(req.RefreshToken) {
-		settings.RefreshToken = req.RefreshToken
+	if v, ok := raw["refresh_token"].(string); ok && v != "" && !containsMask(v) {
+		settings.RefreshToken = v
 		tokenChanged = true
 		refreshTokenChanged = true
 	}
-	if req.AccessToken != "" && !containsMask(req.AccessToken) {
-		settings.AccessToken = req.AccessToken
+	if v, ok := raw["access_token"].(string); ok && v != "" && !containsMask(v) {
+		settings.AccessToken = v
 		tokenChanged = true
 		accessTokenChanged = true
 	}
-	// 如果刷新了 RefreshToken 但未提供新的 AccessToken，清空旧的 AccessToken
 	if refreshTokenChanged && !accessTokenChanged {
 		settings.AccessToken = ""
 	}
-	settings.RootFolderID = req.RootFolderID
-	settings.SiteTitle = req.SiteTitle
-	settings.SiteLogo = req.SiteLogo
-	settings.LoginTitle = req.LoginTitle
-	settings.LoginAvatar = req.LoginAvatar
-	settings.LoginRoleTag = req.LoginRoleTag
-	settings.LoginLevelTag = req.LoginLevelTag
-	settings.LoginSystemName = req.LoginSystemName
-	settings.ShareFooter = req.ShareFooter
+
+	// 只更新请求中明确包含的字段，避免未传字段覆盖已有数据
+	if v, ok := raw["root_folder_id"].(string); ok {
+		settings.RootFolderID = v
+	}
+	if v, ok := raw["site_title"].(string); ok {
+		settings.SiteTitle = v
+	}
+	if v, ok := raw["site_logo"].(string); ok {
+		settings.SiteLogo = v
+	}
+	if v, ok := raw["login_title"].(string); ok {
+		settings.LoginTitle = v
+	}
+	if v, ok := raw["login_avatar"].(string); ok {
+		settings.LoginAvatar = v
+	}
+	if v, ok := raw["login_role_tag"].(string); ok {
+		settings.LoginRoleTag = v
+	}
+	if v, ok := raw["login_level_tag"].(string); ok {
+		settings.LoginLevelTag = v
+	}
+	if v, ok := raw["login_system_name"].(string); ok {
+		settings.LoginSystemName = v
+	}
+	if v, ok := raw["share_footer"].(string); ok {
+		settings.ShareFooter = v
+	}
 
 	if err := h.settingsRepo.Update(settings); err != nil {
 		c.JSON(http.StatusInternalServerError, model.APIResponse{
@@ -779,7 +925,6 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	// 如果Token更新了，重新初始化客户端
 	if tokenChanged {
 		go h.reinitWopanClient(settings)
 	}
@@ -792,6 +937,12 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 
 // reinitWopanClient 重新初始化云盘客户端
 func (h *Handler) reinitWopanClient(settings *model.Settings) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("重新初始化云盘客户端 panic: %v\n", r)
+		}
+	}()
+
 	client := wopan.NewClient(settings.RefreshToken)
 	client.SetRootFolderID(settings.RootFolderID)
 	if settings.AccessToken != "" {

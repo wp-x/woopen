@@ -247,6 +247,45 @@
           </el-form-item>
         </el-form>
       </el-card>
+
+      <!-- WebDAV 挂载说明 -->
+      <el-card class="masonry-item">
+        <template #header>
+          <span class="card-header">WebDAV 挂载</span>
+        </template>
+
+        <div class="webdav-info">
+          <div class="form-group-static">
+            <span class="label">挂载地址</span>
+            <code class="code-block">{{ webdavUrl }}</code>
+          </div>
+          <div class="form-group-static">
+            <span class="label">认证方式</span>
+            <span>Basic Auth（账号固定 <code>admin</code>，密码为后台管理员密码）</span>
+          </div>
+
+          <el-divider content-position="left">挂载方法</el-divider>
+
+          <el-collapse>
+            <el-collapse-item title="Windows" name="win">
+              <p>方法一：打开「此电脑」→「映射网络驱动器」，输入地址。</p>
+              <p>方法二：命令行：</p>
+              <code class="code-block">net use Z: {{ webdavUrl }} /user:admin 你的密码</code>
+            </el-collapse-item>
+            <el-collapse-item title="macOS" name="mac">
+              <p>Finder → <code>Command + K</code> → 输入挂载地址 → 使用账号 <code>admin</code> 和管理员密码登录。</p>
+            </el-collapse-item>
+            <el-collapse-item title="Linux" name="linux">
+              <p>安装 davfs2 后挂载：</p>
+              <code class="code-block">sudo mount -t davfs {{ webdavUrl }} /mnt/webdav</code>
+            </el-collapse-item>
+          </el-collapse>
+
+          <div class="form-tip" style="margin-top: 12px;">
+            写入实现为"写入临时文件，关闭时一次性上传"，大文件上传会占用磁盘临时空间。
+          </div>
+        </div>
+      </el-card>
     </div>
 
     <!-- 通知记录（全宽） -->
@@ -311,7 +350,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { settingsApi, monitorApi } from '../../api'
+import { publicApi, settingsApi, monitorApi } from '../../api'
 
 const settings = ref({
   initialized: false,
@@ -378,6 +417,22 @@ const saving = ref(false)
 const testing = ref(false)
 const updatingPwd = ref(false)
 
+// Prefer backend-reported external URL (handles reverse-proxy + dev proxy),
+// but fall back to the current origin.
+const webdavUrl = ref(`${window.location.origin}/dav/`)
+
+async function loadWebdavUrl() {
+  try {
+    const res = await publicApi.getSiteConfig()
+    const url = res?.data?.webdav_url
+    if (typeof url === 'string' && url.startsWith('http')) {
+      webdavUrl.value = url
+    }
+  } catch {
+    // ignore: keep fallback
+  }
+}
+
 async function loadSettings() {
   try {
     const res = await settingsApi.get()
@@ -427,11 +482,7 @@ async function testToken() {
 async function saveCloudSettings() {
   saving.value = true
   try {
-    await settingsApi.update({
-      ...cloudForm.value,
-      site_title: siteForm.value.site_title,
-      site_logo: siteForm.value.site_logo
-    })
+    await settingsApi.update(cloudForm.value)
     ElMessage.success('配置已保存，正在重新连接云盘...')
     setTimeout(() => loadSettings(), 2000)
   } catch (error) {
@@ -444,12 +495,7 @@ async function saveCloudSettings() {
 async function saveSiteSettings() {
   saving.value = true
   try {
-    await settingsApi.update({
-      refresh_token: '',
-      access_token: '',
-      root_folder_id: cloudForm.value.root_folder_id,
-      ...siteForm.value
-    })
+    await settingsApi.update(siteForm.value)
     ElMessage.success('站点设置已保存')
   } catch (error) {
     // 错误已处理
@@ -638,6 +684,7 @@ function getChannelLabel(channel: string) {
 
 onMounted(() => {
   loadSettings()
+  loadWebdavUrl()
   loadMonitorSettings()
   loadMonitorStatus()
   loadNotifications()
@@ -702,6 +749,36 @@ onMounted(() => {
 .error-text {
   color: #f56c6c;
   font-size: 12px;
+}
+
+.webdav-info {
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.webdav-info .form-group-static {
+  margin-bottom: 10px;
+}
+
+.webdav-info .label {
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.webdav-info .code-block {
+  display: block;
+  background: #000;
+  color: #ccff00;
+  padding: 8px 12px;
+  margin-top: 4px;
+  font-family: monospace;
+  font-size: 13px;
+  border: 3px solid #000;
+  word-break: break-all;
+}
+
+.webdav-info p {
+  margin: 4px 0;
 }
 
 .pagination-wrapper {

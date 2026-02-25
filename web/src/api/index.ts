@@ -58,7 +58,27 @@ export const authApi = {
 export const fileApi = {
     list: (dirId?: string, page = 1, pageSize = 50) =>
         api.get('/files', { params: { dir_id: dirId, page, page_size: pageSize } }),
-    link: (fid: string) => api.get('/files/link', { params: { fid } })
+    link: (fid: string) => api.get('/files/link', { params: { fid } }),
+    uploadProgress: (uploadId: string) =>
+        api.get('/files/upload/progress', { params: { upload_id: uploadId } }),
+    upload: (file: File, parentId?: string, onProgress?: (percent: number) => void, uploadId?: string) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        if (parentId) formData.append('parent_id', parentId)
+        if (uploadId) formData.append('upload_id', uploadId)
+        return api.post('/files/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 600000,
+            onUploadProgress: (progressEvent) => {
+                if (onProgress && progressEvent.total) {
+                    const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+                    onProgress(percent)
+                }
+            }
+        })
+    },
+    mkdir: (name: string, parentId?: string) =>
+        api.post('/files/mkdir', { name, parent_id: parentId || '0' })
 }
 
 // 分享API

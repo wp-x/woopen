@@ -13,9 +13,11 @@ import (
 	"woopen/internal/middleware"
 	"woopen/internal/repository"
 	"woopen/internal/service"
+	"woopen/internal/webdav"
 	"woopen/internal/wopan"
 
 	"github.com/gin-gonic/gin"
+	xwebdav "golang.org/x/net/webdav"
 )
 
 func main() {
@@ -68,7 +70,7 @@ func main() {
 	r.Use(middleware.CORSMiddleware())
 
 	// 注册路由
-	registerRoutes(r, h)
+	registerRoutes(r, h, wopanClient, cfg.AdminPassword)
 
 	// 启动服务
 	log.Printf("WoOpen 启动成功! 访问: http://localhost:%s", cfg.Port)
@@ -118,7 +120,7 @@ func initWopanClient(settingsRepo *repository.SettingsRepository) *wopan.Client 
 }
 
 // registerRoutes 注册路由
-func registerRoutes(r *gin.Engine, h *handler.Handler) {
+func registerRoutes(r *gin.Engine, h *handler.Handler, wopanClient *wopan.Client, adminPassword string) {
 	distDir := filepath.Join(".", "web", "dist")
 	distExists := false
 	if _, err := os.Stat(distDir); err == nil {
@@ -164,6 +166,9 @@ func registerRoutes(r *gin.Engine, h *handler.Handler) {
 			// 文件操作
 			auth.GET("/files", h.ListFiles)
 			auth.GET("/files/link", h.GetFileLink)
+			auth.POST("/files/upload", h.UploadFile)
+			auth.GET("/files/upload/progress", h.GetUploadProgress)
+			auth.POST("/files/mkdir", h.CreateDirectory)
 
 			// 分享管理
 			auth.GET("/shares", h.ListShares)
@@ -193,6 +198,16 @@ func registerRoutes(r *gin.Engine, h *handler.Handler) {
 			auth.DELETE("/monitor/notifications", h.ClearNotificationLogs)
 		}
 	}
+
+	// ==================== WebDAV ====================
+	davFS := webdav.NewWopanFS(wopanClient)
+	davHandler := &xwebdav.Handler{
+		FileSystem: davFS,
+		LockSystem: xwebdav.NewMemLS(),
+	}
+
+	// WebDAV 路由（需要认证）
+	r.Any("/dav/*filepath", middleware.WebDAVAuthMiddleware(adminPassword), gin.WrapH(davHandler))
 
 	// ==================== 静态文件 ====================
 	if distExists {

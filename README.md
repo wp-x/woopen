@@ -29,6 +29,8 @@
 | 自定义短链 | 比如 `/s/movie` |
 | 访问统计 | 后台能看访问量 |
 | 过期提醒 | Token 快过期会推送通知，支持 Bark、微信、Telegram 这些 |
+| 文件上传 | 通过 API 上传文件到云盘 |
+| WebDAV | 把云盘挂载成网络驱动器，像本地硬盘一样用 |
 
 <br>
 
@@ -168,6 +170,96 @@ server {
 ```
 
 HTTPS 用 certbot 或者套 Cloudflare。
+
+<br>
+
+## 新功能使用说明
+
+### 文件上传 API
+
+可以通过 API 上传文件到云盘，适合自动化脚本或者第三方工具集成。
+
+**上传文件**
+
+```bash
+curl -X POST http://localhost:10010/api/files/upload \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@/path/to/file.txt" \
+  -F "parent_id=0"
+```
+
+**创建目录**
+
+```bash
+curl -X POST http://localhost:10010/api/files/mkdir \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "新文件夹", "parent_id": "0"}'
+```
+
+> `parent_id` 填 `0` 表示根目录，填其他 ID 就是在那个目录下创建。
+
+**获取 Token**
+
+登录后台后，按 `F12` 打开开发者工具，在「网络」标签里找到任意请求，看请求头里的 `Authorization` 字段，复制 `Bearer` 后面的内容。
+
+<br>
+
+### WebDAV 挂载
+
+可以把云盘挂载成网络驱动器，直接在文件管理器里操作文件。
+
+**挂载地址**
+
+```
+http://你的服务器IP:10010/dav/
+```
+
+**认证方式**
+
+WebDAV 使用 **Basic Auth**（账号固定为 `admin`，密码为你配置的后台管理员密码）。
+
+**Windows 挂载**
+
+打开「此电脑」，点击「映射网络驱动器」，输入：
+
+```
+\\你的服务器IP@10010\dav
+```
+
+或者用命令行：
+
+```cmd
+net use Z: http://你的服务器IP:10010/dav/ /user:admin 你的密码
+```
+
+**macOS 挂载**
+
+打开 Finder，按 `Command + K`，输入：
+
+```
+http://你的服务器IP:10010/dav/
+```
+
+输入用户名 `admin` 和你设置的密码。
+
+**Linux 挂载**
+
+安装 davfs2：
+
+```bash
+sudo apt install davfs2
+```
+
+挂载：
+
+```bash
+sudo mount -t davfs http://你的服务器IP:10010/dav/ /mnt/webdav
+```
+
+输入用户名 `admin` 和密码。
+
+> **注意**：WebDAV 的写入实现为“写入到临时文件，关闭时一次性上传”。大文件上传会占用磁盘临时空间。
 
 <br>
 

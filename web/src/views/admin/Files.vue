@@ -49,9 +49,22 @@
                 <el-icon><Grid /></el-icon>
               </el-button>
             </el-button-group>
-            <el-button type="primary" size="small" :icon="Refresh" @click="loadFiles">
+            <el-button type="default" size="small" :icon="UploadFilled" @click="triggerUpload" :loading="uploading">
+              上传
+            </el-button>
+            <el-button type="default" size="small" :icon="FolderAdd" @click="mkdirDialogVisible = true">
+              新建文件夹
+            </el-button>
+            <el-button type="default" size="small" :icon="Refresh" @click="loadFiles" :loading="loading">
               刷新
             </el-button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              multiple
+              style="display: none;"
+              @change="handleFileSelected"
+            />
           </div>
         </div>
       </template>
@@ -196,6 +209,57 @@
         <el-empty description="暂无文件" />
       </div>
     </el-card>
+
+    <!-- 新建文件夹对话框 (Neo-Brutalist) -->
+    <div v-if="mkdirDialogVisible" class="preview-overlay" @click.self="mkdirDialogVisible = false">
+      <div class="window-frame active" style="width: 400px; max-width: 95vw;">
+        <div class="window-header">
+           <span>新建文件夹 // MKDIR</span>
+           <div class="window-controls"><button @click="mkdirDialogVisible = false">X</button></div>
+        </div>
+        <div class="brutal-form-content">
+           <div class="form-group">
+              <label class="brutal-label-tag">文件夹名称_NAME</label>
+              <input v-model="mkdirName" class="brutal-input-reset" placeholder="输入文件夹名称" @keyup.enter="handleMkdir">
+           </div>
+           <div class="form-actions-brutal">
+              <button class="btn-brutal btn-cancel" @click="mkdirDialogVisible = false">取消</button>
+              <button class="btn-brutal btn-confirm" @click="handleMkdir" :disabled="mkdirLoading">
+                 {{ mkdirLoading ? '创建中...' : '创建' }}
+              </button>
+           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上传进度对话框 (Neo-Brutalist) -->
+    <div v-if="uploadDialogVisible" class="preview-overlay">
+      <div class="window-frame active" style="width: 500px; max-width: 95vw;">
+        <div class="window-header">
+           <span>文件上传 // UPLOAD</span>
+           <div class="window-controls"><button @click="closeUploadDialog" :disabled="uploading">X</button></div>
+        </div>
+        <div class="brutal-form-content">
+           <div class="upload-list">
+              <div v-for="(item, index) in uploadList" :key="index" class="upload-item">
+                <div class="upload-item-name">{{ item.name }}</div>
+                <div class="upload-item-progress">
+                  <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: item.progress + '%' }"></div>
+                  </div>
+                  <span class="progress-text">{{ item.progress }}%</span>
+                </div>
+                <div class="upload-item-status" :class="item.status">
+                  {{ item.status === 'uploading' ? '上传中' : item.status === 'success' ? '成功' : '失败' }}
+                </div>
+              </div>
+           </div>
+           <div class="form-actions-brutal" v-if="!uploading">
+              <button class="btn-brutal btn-confirm" @click="closeUploadDialog">关闭</button>
+           </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 创建分享对话框 (Neo-Brutalist) -->
     <div v-if="shareDialogVisible" class="preview-overlay" @click.self="shareDialogVisible = false">
@@ -510,8 +574,10 @@ import {
   Refresh, Grid, List,
   Picture, VideoPlay, Headset, Document as DocIcon,
   CopyDocument, TopRight, ArrowUp,
-  HomeFilled, Folder, Share, View, Download
+  HomeFilled, Folder, Share, View, Download,
+  UploadFilled, FolderAdd
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { fileApi, shareApi } from '../../api'
 
 interface FileInfo {
@@ -536,6 +602,151 @@ const uiStore = useUIStore()
 const viewMode = ref<'list' | 'grid'>('list')
 const sortBy = ref<'name' | 'size' | 'time'>('time')
 const sortOrder = ref<'asc' | 'desc'>('desc')
+
+// 上传相关
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const uploading = ref(false)
+const uploadDialogVisible = ref(false)
+const uploadList = ref<Array<{
+  name: string
+  progress: number
+  status: 'uploading' | 'success' | 'failed'
+}>>([])
+
+function triggerUpload() {
+  fileInputRef.value?.click()
+}
+
+function closeUploadDialog() {
+  uploadDialogVisible.value = false
+  uploadList.value = []
+}
+
+async function handleFileSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) return
+  const fileList = Array.from(input.files)
+  input.value = ''
+
+  // 初始化上传列表
+  uploadList.value = fileList.map(file => ({
+    name: file.name,
+    progress: 0,
+    status: 'uploading' as const
+  }))
+  uploadDialogVisible.value = true
+  uploading.value = true
+
+  let success = 0
+  let fail = 0
+
+  for (let i = 0; i < fileList.length; i++) {
+    const file = fileList[i]
+    const uploadItem = uploadList.value[i]
+    if (!file || !uploadItem) continue
+
+    let stopPolling = false
+    let pollPromise: Promise<void> | null = null
+
+    try {
+      const uploadId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `u_${Date.now()}_${Math.random().toString(16).slice(2)}`
+
+      let serverSeen = false
+
+      const pollProgress = async () => {
+        while (!stopPolling) {
+          try {
+            const resp: any = await fileApi.uploadProgress(uploadId)
+            const data = resp?.data
+            if (data?.found) {
+              serverSeen = true
+              const item = uploadList.value[i]
+              if (item && typeof data.percent === 'number') {
+                item.progress = Math.max(0, Math.min(100, data.percent))
+              }
+
+              // 如果后端已经明确结束，提前停止轮询（UploadFile 返回可能稍后才到前端 await）。
+              if (data.status === 'success' || data.status === 'failed') {
+                break
+              }
+            }
+          } catch {
+            // 轮询失败不提示（避免打扰上传流程）；下一轮继续。
+          }
+          await new Promise((r) => setTimeout(r, 400))
+        }
+      }
+
+      pollPromise = pollProgress()
+      await fileApi.upload(
+        file,
+        currentDirId.value || '0',
+        (percent) => {
+          // 这是“本地 -> 本服务”的进度，真正耗时常在“本服务 -> 云盘”。
+          // 后端进度可用后，以后端为准。
+          if (serverSeen) return
+          const item = uploadList.value[i]
+          if (item) item.progress = Math.max(item.progress, Math.min(95, percent))
+        },
+        uploadId
+      )
+      stopPolling = true
+      await pollPromise
+
+      uploadItem.status = 'success'
+      uploadItem.progress = 100
+      success++
+    } catch (error) {
+      stopPolling = true
+      if (pollPromise) {
+        try {
+          await pollPromise
+        } catch {
+          // ignore
+        }
+      }
+      uploadItem.status = 'failed'
+      fail++
+    }
+  }
+
+  uploading.value = false
+
+  if (fail === 0) {
+    ElMessage.success(`上传完成，共 ${success} 个文件`)
+  } else {
+    ElMessage.warning(`上传完成：成功 ${success}，失败 ${fail}`)
+  }
+  loadFiles()
+}
+
+// 新建文件夹
+const mkdirDialogVisible = ref(false)
+const mkdirName = ref('')
+const mkdirLoading = ref(false)
+
+async function handleMkdir() {
+  const name = mkdirName.value.trim()
+  if (!name) {
+    ElMessage.warning('请输入文件夹名称')
+    return
+  }
+  mkdirLoading.value = true
+  try {
+    await fileApi.mkdir(name, currentDirId.value || '0')
+    ElMessage.success('文件夹创建成功')
+    mkdirDialogVisible.value = false
+    mkdirName.value = ''
+    loadFiles()
+  } catch {
+    // 错误已处理
+  } finally {
+    mkdirLoading.value = false
+  }
+}
 
 // 键盘事件监听
 const handleKeydown = (e: KeyboardEvent) => {
@@ -1781,5 +1992,72 @@ onMounted(() => {
     min-width: 44px;
     min-height: 44px;
   }
+}
+
+/* 上传进度对话框样式 */
+.upload-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.upload-item {
+  padding: 12px;
+  border: 2px solid var(--pure-black);
+  background: var(--pure-white);
+  margin-bottom: 10px;
+}
+
+.upload-item-name {
+  font-weight: bold;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.upload-item-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 20px;
+  border: 2px solid var(--pure-black);
+  background: var(--pure-white);
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--acid-green);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-family: monospace;
+  font-weight: bold;
+  min-width: 40px;
+  text-align: right;
+}
+
+.upload-item-status {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.upload-item-status.uploading {
+  color: var(--acid-blue);
+}
+
+.upload-item-status.success {
+  color: var(--acid-green);
+}
+
+.upload-item-status.failed {
+  color: var(--acid-pink);
 }
 </style>
