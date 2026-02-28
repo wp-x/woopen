@@ -1,5 +1,6 @@
 # Binaries
 woopen
+/server
 main
 test
 *.exe

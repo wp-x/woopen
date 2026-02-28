@@ -165,22 +165,26 @@ func (fs *WopanFS) openDirectory(ctx context.Context, name string) (webdav.File,
 		return nil, err
 	}
 
-	// 转换为 os.FileInfo
+	now := time.Now()
 	fileInfos := make([]os.FileInfo, 0, len(files))
 	for _, f := range files {
+		modTime := f.ModTime
+		if modTime.IsZero() {
+			modTime = now
+		}
 		fileInfos = append(fileInfos, &fileInfo{
 			name:    f.Name,
 			size:    f.Size,
 			mode:    fs.getFileMode(f),
-			modTime: f.ModTime,
+			modTime: modTime,
 			isDir:   f.IsDir,
 		})
 	}
 
 	return &wopanDir{
-		name:     name,
-		files:    fileInfos,
-		position: 0,
+		name:    name,
+		modTime: now,
+		files:   fileInfos,
 	}, nil
 }
 

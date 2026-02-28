@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"time"
 )
 
 // wopanFile 实现 webdav.File 接口（文件）
@@ -222,6 +224,7 @@ func (f *wopanFile) initTmp() error {
 // wopanDir 实现 webdav.File 接口（目录）
 type wopanDir struct {
 	name     string
+	modTime  time.Time
 	files    []os.FileInfo
 	position int
 }
@@ -296,10 +299,15 @@ func (d *wopanDir) Readdir(count int) ([]os.FileInfo, error) {
 
 // Stat 获取目录信息
 func (d *wopanDir) Stat() (os.FileInfo, error) {
+	modTime := d.modTime
+	if modTime.IsZero() {
+		modTime = time.Now()
+	}
 	return &fileInfo{
-		name:  d.name,
-		size:  0,
-		mode:  os.ModeDir | 0755,
-		isDir: true,
+		name:    path.Base(d.name),
+		size:    0,
+		mode:    os.ModeDir | 0755,
+		modTime: modTime,
+		isDir:   true,
 	}, nil
 }
