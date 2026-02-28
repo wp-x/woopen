@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -172,14 +173,14 @@ func (n *Notifier) sendBark(barkURL, title, message string) error {
 		if code, ok := result["code"].(float64); ok && code != 200 {
 			errMsg := fmt.Sprintf("Bark 返回错误: %v", result["message"])
 			n.logNotification("bark", title, "failed", errMsg)
-			return fmt.Errorf(errMsg)
+			return errors.New(errMsg)
 		}
 	}
 
 	if resp.StatusCode >= 400 {
 		errMsg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		n.logNotification("bark", title, "failed", errMsg)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	n.logNotification("bark", title, "success", "")
@@ -203,7 +204,7 @@ func (n *Notifier) sendServerchan(sendKey, title, message string) error {
 	if resp.StatusCode >= 400 {
 		errMsg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		n.logNotification("serverchan", title, "failed", errMsg)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	n.logNotification("serverchan", title, "success", "")
@@ -232,7 +233,7 @@ func (n *Notifier) sendTelegram(botToken, chatID, title, message string) error {
 	if resp.StatusCode >= 400 {
 		errMsg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		n.logNotification("telegram", title, "failed", errMsg)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	n.logNotification("telegram", title, "success", "")
@@ -259,7 +260,7 @@ func (n *Notifier) sendPushplus(token, title, message string) error {
 	if resp.StatusCode >= 400 {
 		errMsg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		n.logNotification("pushplus", title, "failed", errMsg)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	n.logNotification("pushplus", title, "success", "")
@@ -287,7 +288,7 @@ func (n *Notifier) sendDingtalk(webhook, title, message string) error {
 	if resp.StatusCode >= 400 {
 		errMsg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		n.logNotification("dingtalk", title, "failed", errMsg)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	n.logNotification("dingtalk", title, "success", "")
@@ -314,7 +315,7 @@ func (n *Notifier) sendWecom(webhook, title, message string) error {
 	if resp.StatusCode >= 400 {
 		errMsg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		n.logNotification("wecom", title, "failed", errMsg)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	n.logNotification("wecom", title, "success", "")

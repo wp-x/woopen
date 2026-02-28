@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/base64"
+	"errors"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"woopen/internal/config"
@@ -42,15 +45,17 @@ func initRepositories(db *repository.Database) repoBundle {
 }
 
 func initHandler(repos repoBundle, wopanClient *wopan.Client, adminPassword string) *handler.Handler {
-	return handler.NewHandler(
-		repos.settings,
-		repos.share,
-		repos.accessLog,
-		repos.monitor,
-		repos.notification,
-		wopanClient,
-		adminPassword,
-	)
+	listCache := handler.NewListTTLCache(handler.DefaultListCacheTTL)
+	return handler.NewHandler(handler.HandlerOptions{
+		SettingsRepo:        repos.settings,
+		ShareRepo:           repos.share,
+		AccessLogRepo:       repos.accessLog,
+		MonitorRepo:         repos.monitor,
+		NotificationLogRepo: repos.notification,
+		WopanClient:         wopanClient,
+		AdminPassword:       adminPassword,
+		ListCache:           listCache,
+	})
 }
 
 func initMonitorService(repos repoBundle, wopanClient *wopan.Client, h *handler.Handler) *service.MonitorService {
@@ -81,7 +86,7 @@ func newWebDAVHandler(wopanClient *wopan.Client, adminPassword string) http.Hand
 	dav := &xwebdav.Handler{
 		Prefix:     "/dav",
 		FileSystem: davFS,
-		LockSystem: xwebdav.NewMemLS(),
+		LockSystem: webdav.NewNoLockSystem(),
 		Logger: func(r *http.Request, err error) {
 			if err != nil {
 				log.Printf("[WebDAV] %s %s → error: %v", r.Method, r.URL.Path, err)
@@ -111,10 +116,37 @@ func newWebDAVHandler(wopanClient *wopan.Client, adminPassword string) http.Hand
 			if reqPath == "" {
 				reqPath = "/"
 			}
-			if fi, err := davFS.Stat(r.Context(), reqPath); err == nil && fi.IsDir() {
+			if reqPath == "/" {
 				w.Header().Set("Content-Type", "httpd/unix-directory")
 				w.Header().Set("Content-Length", "0")
 				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			resolved, err := davFS.ResolvePath(r.Context(), reqPath)
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					http.NotFound(w, r)
+					return
+				}
+				http.Error(w, "WebDAV resolve failed: "+err.Error(), http.StatusBadGateway)
+				return
+			}
+
+			if resolved.Info != nil && resolved.Info.IsDir {
+				w.Header().Set("Content-Type", "httpd/unix-directory")
+				w.Header().Set("Content-Length", "0")
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			if resolved.Info != nil {
+				downloadURL, err := wopanClient.GetDownloadURL(resolved.ID)
+				if err != nil {
+					http.Error(w, "WebDAV redirect failed: "+err.Error(), http.StatusBadGateway)
+					return
+				}
+				http.Redirect(w, r, downloadURL, http.StatusTemporaryRedirect)
 				return
 			}
 		}
@@ -124,25 +156,57 @@ func newWebDAVHandler(wopanClient *wopan.Client, adminPassword string) http.Hand
 }
 
 func authenticateWebDAV(w http.ResponseWriter, r *http.Request, adminPassword string) bool {
-	auth := r.Header.Get("Authorization")
+	auth := getWebDAVAuthHeader(r)
 	if auth == "" {
+		log.Printf("[WebDAV] auth missing: %s %s ua=%q", r.Method, r.URL.Path, r.UserAgent())
 		davChallenge(w)
 		return false
 	}
-	if strings.HasPrefix(auth, "Bearer ") {
-		if !middleware.ValidateToken(strings.TrimPrefix(auth, "Bearer ")) {
+	lower := strings.ToLower(auth)
+	if strings.HasPrefix(lower, "bearer ") {
+		token := strings.TrimSpace(auth[len("Bearer "):])
+		if !middleware.ValidateToken(token) {
+			log.Printf("[WebDAV] bearer invalid: %s %s ua=%q", r.Method, r.URL.Path, r.UserAgent())
 			davChallenge(w)
 			return false
 		}
 		return true
 	}
-	user, pass, ok := r.BasicAuth()
+	user, pass, ok := parseBasicAuth(auth)
 	if !ok || user != "admin" || pass != adminPassword {
 		log.Printf("[WebDAV] auth failed: user=%q ok=%v", user, ok)
 		davChallenge(w)
 		return false
 	}
 	return true
+}
+
+func getWebDAVAuthHeader(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	if auth != "" {
+		return auth
+	}
+	auth = r.Header.Get("X-Forwarded-Authorization")
+	if auth != "" {
+		return auth
+	}
+	return r.Header.Get("X-Original-Authorization")
+}
+
+func parseBasicAuth(auth string) (string, string, bool) {
+	if !strings.HasPrefix(strings.ToLower(auth), "basic ") {
+		return "", "", false
+	}
+	raw := strings.TrimSpace(auth[len("Basic "):])
+	decoded, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		return "", "", false
+	}
+	user, pass, ok := strings.Cut(string(decoded), ":")
+	if !ok {
+		return "", "", false
+	}
+	return user, pass, true
 }
 
 func davChallenge(w http.ResponseWriter) {

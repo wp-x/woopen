@@ -48,30 +48,39 @@ type Handler struct {
 	wopanClient         *wopan.Client
 	adminPassword       string
 	monitorService      MonitorServiceInterface
+	listCache           ListCache
 
 	// uploadProgress holds best-effort server-side upload progress keyed by upload_id.
 	// Used by the admin UI polling endpoint to show real progress during Upload2C.
 	uploadProgress sync.Map
 }
 
+// HandlerOptions 构建 Handler 的依赖
+type HandlerOptions struct {
+	SettingsRepo        *repository.SettingsRepository
+	ShareRepo           *repository.ShareRepository
+	AccessLogRepo       *repository.AccessLogRepository
+	MonitorRepo         *repository.MonitorRepository
+	NotificationLogRepo *repository.NotificationLogRepository
+	WopanClient         *wopan.Client
+	AdminPassword       string
+	ListCache           ListCache
+}
+
 // NewHandler 创建Handler
-func NewHandler(
-	settingsRepo *repository.SettingsRepository,
-	shareRepo *repository.ShareRepository,
-	accessLogRepo *repository.AccessLogRepository,
-	monitorRepo *repository.MonitorRepository,
-	notificationLogRepo *repository.NotificationLogRepository,
-	wopanClient *wopan.Client,
-	adminPassword string,
-) *Handler {
+func NewHandler(opts HandlerOptions) *Handler {
+	if opts.ListCache == nil {
+		panic("list cache is required")
+	}
 	return &Handler{
-		settingsRepo:        settingsRepo,
-		shareRepo:           shareRepo,
-		accessLogRepo:       accessLogRepo,
-		monitorRepo:         monitorRepo,
-		notificationLogRepo: notificationLogRepo,
-		wopanClient:         wopanClient,
-		adminPassword:       adminPassword,
+		settingsRepo:        opts.SettingsRepo,
+		shareRepo:           opts.ShareRepo,
+		accessLogRepo:       opts.AccessLogRepo,
+		monitorRepo:         opts.MonitorRepo,
+		notificationLogRepo: opts.NotificationLogRepo,
+		wopanClient:         opts.WopanClient,
+		adminPassword:       opts.AdminPassword,
+		listCache:           opts.ListCache,
 	}
 }
 
@@ -189,11 +198,28 @@ func (h *Handler) ListFiles(c *gin.Context) {
 	dirID := c.Query("dir_id")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	req := ListRequest{
+		DirID:    dirID,
+		Page:     page,
+		PageSize: pageSize,
+	}
 
 	if !h.wopanClient.IsInitialized() {
 		c.JSON(http.StatusServiceUnavailable, model.APIResponse{
 			Code:    503,
 			Message: "云盘客户端未初始化，请先配置Token",
+		})
+		return
+	}
+
+	if files, ok := h.listCache.Get(req); ok {
+		c.JSON(http.StatusOK, model.APIResponse{
+			Code:    0,
+			Message: "success",
+			Data: gin.H{
+				"files": files,
+				"page":  page,
+			},
 		})
 		return
 	}
@@ -206,6 +232,7 @@ func (h *Handler) ListFiles(c *gin.Context) {
 		})
 		return
 	}
+	h.listCache.Set(req, files)
 
 	c.JSON(http.StatusOK, model.APIResponse{
 		Code:    0,
@@ -317,6 +344,7 @@ func (h *Handler) UploadFile(c *gin.Context) {
 	time.AfterFunc(2*time.Minute, func() {
 		h.uploadProgress.Delete(uploadID)
 	})
+	h.listCache.InvalidateDir(parentID)
 
 	c.Header("X-Upload-Id", uploadID)
 	c.JSON(http.StatusOK, model.APIResponse{
@@ -357,6 +385,7 @@ func (h *Handler) CreateDirectory(c *gin.Context) {
 		})
 		return
 	}
+	h.listCache.InvalidateDir(req.ParentID)
 
 	c.JSON(http.StatusOK, model.APIResponse{
 		Code:    0,
@@ -1235,7 +1264,7 @@ func (h *Handler) GetShareFiles(c *gin.Context) {
 	}
 
 	// 获取文件列表
-	files, err := h.wopanClient.ListFiles(dirID, 1, 100)
+	files, err := h.listAllShareFiles(dirID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.APIResponse{
 			Code:    500,

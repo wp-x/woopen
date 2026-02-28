@@ -202,10 +202,14 @@ func (f *wopanFile) upload() error {
 	if err != nil {
 		return err
 	}
+	if f.parentID != "" {
+		f.fs.invalidateDirCache(f.parentID)
+	}
+	f.fs.invalidatePathCache(f.name)
 	if f.overwriteFileID != "" {
 		_ = f.fs.client.Delete(context.Background(), false, f.overwriteFileID)
 	}
-	return err
+	return nil
 }
 
 func (f *wopanFile) initTmp() error {

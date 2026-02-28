@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 	"time"
 	"woopen/internal/wopan"
 
@@ -14,24 +15,31 @@ import (
 // WopanFS 实现 webdav.FileSystem 接口
 type WopanFS struct {
 	client *wopan.Client
+
+	dirCacheMu  sync.RWMutex
+	dirCache    map[string]*dirCacheEntry
+	pathCacheMu sync.RWMutex
+	pathCache   map[string]*pathCacheEntry
 }
 
 // NewWopanFS 创建新的 WebDAV 文件系统
 func NewWopanFS(client *wopan.Client) *WopanFS {
 	return &WopanFS{
-		client: client,
+		client:    client,
+		dirCache:  make(map[string]*dirCacheEntry),
+		pathCache: make(map[string]*pathCacheEntry),
 	}
 }
 
 // Mkdir 创建目录
 func (fs *WopanFS) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
-	name = path.Clean(name)
-	if name == "/" || name == "." {
+	cleanName := path.Clean(name)
+	if cleanName == "/" || cleanName == "." {
 		return os.ErrExist
 	}
 
-	parentPath := path.Dir(name)
-	dirName := path.Base(name)
+	parentPath := path.Dir(cleanName)
+	dirName := path.Base(cleanName)
 
 	// 获取父目录ID
 	parentID, err := fs.getFileIDByPath(ctx, parentPath)
@@ -40,66 +48,102 @@ func (fs *WopanFS) Mkdir(ctx context.Context, name string, perm os.FileMode) err
 	}
 
 	_, err = fs.client.CreateDirectory(parentID, dirName)
-	return err
+	if err != nil {
+		return err
+	}
+	fs.invalidateDirCache(parentID)
+	fs.invalidatePathCache(cleanName)
+	return nil
 }
 
 // OpenFile 打开文件
 func (fs *WopanFS) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
-	name = path.Clean(name)
+	cleanName := path.Clean(name)
 
-	// 获取文件信息
-	fileInfo, err := fs.Stat(ctx, name)
+	if cleanName == "/" || cleanName == "." {
+		return fs.openDirectory(ctx, cleanName)
+	}
+
+	id, parentID, info, err := fs.lookupPath(ctx, cleanName)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
 
-	// 如果文件不存在且需要创建
-	if os.IsNotExist(err) && (flag&os.O_CREATE) != 0 {
-		return fs.createFile(ctx, name, flag, perm)
+	if os.IsNotExist(err) || info == nil {
+		if (flag & os.O_CREATE) == 0 {
+			return nil, os.ErrNotExist
+		}
+		parentPath := path.Dir(cleanName)
+		newParentID, parentErr := fs.getFileIDByPath(ctx, parentPath)
+		if parentErr != nil {
+			return nil, parentErr
+		}
+		return fs.createFile(ctx, createFileParams{
+			name:     cleanName,
+			flag:     flag,
+			perm:     perm,
+			parentID: newParentID,
+		})
 	}
 
-	if os.IsNotExist(err) {
-		return nil, err
+	if info.IsDir {
+		return fs.openDirectory(ctx, cleanName)
 	}
 
-	// 打开已存在的文件
-	return fs.openExistingFile(ctx, name, fileInfo, flag)
+	return fs.openExistingFile(openExistingFileParams{
+		name:     cleanName,
+		fileID:   id,
+		parentID: parentID,
+		info:     fs.fileInfoFromModel(info),
+		flag:     flag,
+	})
 }
 
 // RemoveAll 删除文件或目录
 func (fs *WopanFS) RemoveAll(ctx context.Context, name string) error {
-	name = path.Clean(name)
-	if name == "/" || name == "." {
+	cleanName := path.Clean(name)
+	if cleanName == "/" || cleanName == "." {
 		return fmt.Errorf("refuse to delete root")
 	}
 
-	_, _, info, err := fs.lookupPath(ctx, name)
+	_, parentID, info, err := fs.lookupPath(ctx, cleanName)
 	if err != nil {
 		return err
 	}
 	if info == nil {
 		return os.ErrNotExist
 	}
-	return fs.client.Delete(ctx, info.IsDir, info.ID)
+	if err := fs.client.Delete(ctx, info.IsDir, info.ID); err != nil {
+		return err
+	}
+	if parentID != "" {
+		fs.invalidateDirCache(parentID)
+	}
+	if info.IsDir {
+		fs.invalidatePathPrefix(cleanName)
+		return nil
+	}
+	fs.invalidatePathCache(cleanName)
+	return nil
 }
 
 // Rename 重命名文件或目录
 func (fs *WopanFS) Rename(ctx context.Context, oldName, newName string) error {
-	oldName = path.Clean(oldName)
-	newName = path.Clean(newName)
-	if oldName == "/" || oldName == "." || newName == "/" || newName == "." {
+	cleanOld := path.Clean(oldName)
+	cleanNew := path.Clean(newName)
+	if cleanOld == "/" || cleanOld == "." || cleanNew == "/" || cleanNew == "." {
 		return fmt.Errorf("invalid rename")
 	}
-	if err := validateTargetParent(newName); err != nil {
+	if err := validateTargetParent(cleanNew); err != nil {
 		return err
 	}
 
 	// Do not overwrite existing targets implicitly.
-	if _, _, _, err := fs.lookupPath(ctx, newName); err == nil {
+	if _, _, _, err := fs.lookupPath(ctx, cleanNew); err == nil {
 		return os.ErrExist
 	}
 
-	id, _, info, err := fs.lookupPath(ctx, oldName)
+	id, _, info, err := fs.lookupPath(ctx, cleanOld)
 	if err != nil {
 		return err
 	}
@@ -107,16 +151,16 @@ func (fs *WopanFS) Rename(ctx context.Context, oldName, newName string) error {
 		return os.ErrNotExist
 	}
 
-	oldBase := path.Base(oldName)
-	newBase := path.Base(newName)
-	newParentPath := path.Dir(newName)
+	oldBase := path.Base(cleanOld)
+	newBase := path.Base(cleanNew)
+	newParentPath := path.Dir(cleanNew)
 	newParentID, err := fs.getFileIDByPath(ctx, newParentPath)
 	if err != nil {
 		return err
 	}
 
 	// If parent differs, move first.
-	oldParentPath := path.Dir(oldName)
+	oldParentPath := path.Dir(cleanOld)
 	oldParentID, err := fs.getFileIDByPath(ctx, oldParentPath)
 	if err != nil {
 		return err
@@ -130,17 +174,33 @@ func (fs *WopanFS) Rename(ctx context.Context, oldName, newName string) error {
 
 	// Then rename if needed.
 	if oldBase != newBase {
-		return fs.client.Rename(ctx, info.IsDir, id, newBase)
+		if err := fs.client.Rename(ctx, info.IsDir, id, newBase); err != nil {
+			return err
+		}
 	}
+
+	if oldParentID != "" {
+		fs.invalidateDirCache(oldParentID)
+	}
+	if newParentID != "" {
+		fs.invalidateDirCache(newParentID)
+	}
+	if info.IsDir {
+		fs.invalidatePathPrefix(cleanOld)
+		fs.invalidatePathPrefix(cleanNew)
+		return nil
+	}
+	fs.invalidatePathCache(cleanOld)
+	fs.invalidatePathCache(cleanNew)
 	return nil
 }
 
 // Stat 获取文件信息
 func (fs *WopanFS) Stat(ctx context.Context, name string) (os.FileInfo, error) {
-	name = path.Clean(name)
+	cleanName := path.Clean(name)
 
 	// 根目录
-	if name == "/" || name == "." {
+	if cleanName == "/" || cleanName == "." {
 		return &fileInfo{
 			name:    "/",
 			size:    0,
@@ -151,7 +211,7 @@ func (fs *WopanFS) Stat(ctx context.Context, name string) (os.FileInfo, error) {
 	}
 
 	// 先确认该路径存在（同时可区分 NotExist）
-	_, _, info, err := fs.lookupPath(ctx, name)
+	_, _, info, err := fs.lookupPath(ctx, cleanName)
 	if err != nil {
 		return nil, err
 	}
@@ -159,22 +219,5 @@ func (fs *WopanFS) Stat(ctx context.Context, name string) (os.FileInfo, error) {
 		return nil, os.ErrNotExist
 	}
 
-	// 获取父目录的内容再匹配目标（client.ListFiles 期望的是目录 ID，而不是路径）
-	parentID, err := fs.getFileIDByPath(ctx, path.Dir(name))
-	if err != nil {
-		return nil, err
-	}
-
-	fileName := path.Base(name)
-	f, err := fs.findChildByName(ctx, parentID, fileName)
-	if err != nil {
-		return nil, err
-	}
-	return &fileInfo{
-		name:    f.Name,
-		size:    f.Size,
-		mode:    fs.getFileMode(f),
-		modTime: f.ModTime,
-		isDir:   f.IsDir,
-	}, nil
+	return fs.fileInfoFromModel(info), nil
 }

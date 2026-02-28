@@ -12,144 +12,83 @@ import (
 	"golang.org/x/net/webdav"
 )
 
-const listPageSize = 200
-
-// getFileIDByPath 根据路径获取文件ID（可用于目录或文件）
-func (fs *WopanFS) getFileIDByPath(ctx context.Context, filePath string) (string, error) {
-	id, _, _, err := fs.lookupPath(ctx, filePath)
-	return id, err
-}
-
-// lookupPath resolves a unix-style path into cloud IDs.
-//
-// Returns:
-// - id: the object's ID (directory id or file id)
-// - parentID: the parent directory ID ("0" for root)
-// - info: best-effort FileInfo (nil for root)
-func (fs *WopanFS) lookupPath(ctx context.Context, filePath string) (id string, parentID string, info *model.FileInfo, err error) {
-	filePath = path.Clean(filePath)
-
-	// 根目录
-	if filePath == "/" || filePath == "." {
-		return "0", "0", nil, nil
-	}
-
-	// 分割路径
-	parts := strings.Split(strings.Trim(filePath, "/"), "/")
-	currentID := "0" // 从根目录开始
-	currentParentID := "0"
-
-	// 逐级查找
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-
-		child, err := fs.findChildByName(ctx, currentID, part)
-		if err != nil {
-			return "", "", nil, err
-		}
-		currentParentID = currentID
-		currentID = child.ID
-		info = child
-	}
-
-	return currentID, currentParentID, info, nil
-}
-
-func (fs *WopanFS) findChildByName(ctx context.Context, dirID, name string) (*model.FileInfo, error) {
-	// Iterate pages to avoid "not found" when dir has > page size entries.
-	page := 1
-	for {
-		files, err := fs.client.ListFiles(dirID, page, listPageSize)
-		if err != nil {
-			return nil, err
-		}
-		for _, f := range files {
-			if f.Name == name {
-				return f, nil
-			}
-		}
-		if len(files) < listPageSize {
-			break
-		}
-		page++
-	}
-	return nil, os.ErrNotExist
-}
-
-func (fs *WopanFS) listAllInDir(ctx context.Context, dirID string) ([]*model.FileInfo, error) {
-	var out []*model.FileInfo
-	page := 1
-	for {
-		files, err := fs.client.ListFiles(dirID, page, listPageSize)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, files...)
-		if len(files) < listPageSize {
-			break
-		}
-		page++
-	}
-	return out, nil
+type createFileParams struct {
+	name     string
+	flag     int
+	perm     os.FileMode
+	parentID string
 }
 
 // createFile 创建新文件
-func (fs *WopanFS) createFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
-	parentPath := path.Dir(name)
-	fileName := path.Base(name)
-
-	// 获取父目录ID
-	parentID, err := fs.getFileIDByPath(ctx, parentPath)
-	if err != nil {
-		return nil, err
+func (fs *WopanFS) createFile(ctx context.Context, params createFileParams) (webdav.File, error) {
+	cleanName := path.Clean(params.name)
+	if isIgnoredName(cleanName) {
+		return newNoopFile(cleanName), nil
+	}
+	fileName := path.Base(cleanName)
+	parentID := params.parentID
+	if parentID == "" {
+		parentPath := path.Dir(cleanName)
+		id, err := fs.getFileIDByPath(ctx, parentPath)
+		if err != nil {
+			return nil, err
+		}
+		parentID = id
 	}
 
 	return &wopanFile{
 		fs:       fs,
-		name:     name,
+		name:     cleanName,
 		parentID: parentID,
 		fileName: fileName,
-		flag:     flag,
+		flag:     params.flag,
 		isNew:    true,
 		// Use temp file spooling for WebDAV writes; avoid holding everything in memory.
 	}, nil
 }
 
-// openExistingFile 打开已存在的文件
-func (fs *WopanFS) openExistingFile(ctx context.Context, name string, info os.FileInfo, flag int) (webdav.File, error) {
-	if info.IsDir() {
-		return fs.openDirectory(ctx, name)
-	}
+type openExistingFileParams struct {
+	name     string
+	fileID   string
+	parentID string
+	info     os.FileInfo
+	flag     int
+}
 
-	fileID, parentID, _, err := fs.lookupPath(ctx, name)
-	if err != nil {
-		return nil, err
+// openExistingFile 打开已存在的文件
+func (fs *WopanFS) openExistingFile(params openExistingFileParams) (webdav.File, error) {
+	if params.info == nil {
+		return nil, os.ErrNotExist
+	}
+	if isIgnoredName(params.name) {
+		return newNoopFile(params.name), nil
+	}
+	if params.info.IsDir() {
+		return nil, os.ErrInvalid
 	}
 
 	// If opened for writing, implement overwrite by uploading a new file and deleting the old one.
-	if (flag&os.O_WRONLY) != 0 || (flag&os.O_RDWR) != 0 || (flag&os.O_TRUNC) != 0 {
+	if (params.flag&os.O_WRONLY) != 0 || (params.flag&os.O_RDWR) != 0 || (params.flag&os.O_TRUNC) != 0 {
 		return &wopanFile{
 			fs:              fs,
-			name:            name,
-			fileID:          fileID,
-			overwriteFileID: fileID,
-			parentID:        parentID,
-			fileName:        path.Base(name),
-			flag:            flag,
+			name:            params.name,
+			fileID:          params.fileID,
+			overwriteFileID: params.fileID,
+			parentID:        params.parentID,
+			fileName:        path.Base(params.name),
+			flag:            params.flag,
 			isNew:           true, // treat as "new upload on Close"
-			fileInfo:        info,
+			fileInfo:        params.info,
 		}, nil
 	}
 
 	return &wopanFile{
 		fs:       fs,
-		name:     name,
-		fileID:   fileID,
-		flag:     flag,
+		name:     params.name,
+		fileID:   params.fileID,
+		flag:     params.flag,
 		isNew:    false,
-		fileInfo: info,
+		fileInfo: params.info,
 	}, nil
 }
 
@@ -160,14 +99,18 @@ func (fs *WopanFS) openDirectory(ctx context.Context, name string) (webdav.File,
 		return nil, err
 	}
 
-	files, err := fs.listAllInDir(ctx, dirID)
+	files, err := fs.listAllInDirCached(ctx, dirID)
 	if err != nil {
 		return nil, err
 	}
+	fs.primeChildPathCache(name, dirID, files)
 
 	now := time.Now()
 	fileInfos := make([]os.FileInfo, 0, len(files))
 	for _, f := range files {
+		if f == nil || isIgnoredName(f.Name) {
+			continue
+		}
 		modTime := f.ModTime
 		if modTime.IsZero() {
 			modTime = now
@@ -194,6 +137,31 @@ func (fs *WopanFS) getFileMode(f *model.FileInfo) os.FileMode {
 		return os.ModeDir | 0755
 	}
 	return 0644
+}
+
+func (fs *WopanFS) fileInfoFromModel(info *model.FileInfo) os.FileInfo {
+	if info == nil {
+		return nil
+	}
+	modTime := info.ModTime
+	if modTime.IsZero() {
+		modTime = time.Now()
+	}
+	return &fileInfo{
+		name:    info.Name,
+		size:    info.Size,
+		mode:    fs.getFileMode(info),
+		modTime: modTime,
+		isDir:   info.IsDir,
+	}
+}
+
+func isIgnoredName(name string) bool {
+	base := path.Base(name)
+	if base == ".DS_Store" || base == ".qspacesettings" {
+		return true
+	}
+	return strings.HasPrefix(base, "._")
 }
 
 // fileInfo 实现 os.FileInfo 接口
