@@ -19,6 +19,9 @@
                 <Document v-else />
               </el-icon>
               <span>{{ row.target_name }}</span>
+              <span class="type-badge" :class="row.is_direct ? 'direct' : 'share'">
+                {{ row.is_direct ? '直连' : '分享' }}
+              </span>
             </div>
           </template>
         </el-table-column>
@@ -26,17 +29,17 @@
           <template #default="{ row }">
             <div class="link-actions">
               <el-tooltip content="复制链接" placement="top" :hide-after="0">
-                <el-button 
+                <el-button
                   class="btn-brutal-icon"
-                  @click="copyLink(row.share_code)"
+                  @click="copyLink(row.share_code, row.is_direct)"
                 >
                   <el-icon><CopyDocument /></el-icon>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="打开链接" placement="top" :hide-after="0">
-                <el-button 
+                <el-button
                   class="btn-brutal-icon secondary"
-                  @click="openLink(row.share_code)"
+                  @click="openLink(row.share_code, row.is_direct)"
                 >
                   <el-icon><TopRight /></el-icon>
                 </el-button>
@@ -58,7 +61,8 @@
         <el-table-column label="访问/下载" width="140">
           <template #default="{ row }">
             <span style="font-family: monospace; font-weight: bold;">
-              {{ row.view_count }} / {{ row.download_count }}
+              <template v-if="row.is_direct">引用 {{ row.download_count }}</template>
+              <template v-else>{{ row.view_count }} / {{ row.download_count }}</template>
               <span v-if="row.max_downloads > 0" style="color: #909399;">
                 (限{{ row.max_downloads }}次)
               </span>
@@ -108,11 +112,16 @@
             <template #prepend>/s/</template>
           </el-input>
         </el-form-item>
+        <el-form-item label="直连模式">
+          <el-switch v-model="editForm.is_direct" />
+          <div class="form-tip">图床/外链嵌入，生成 /f/ 链接，不支持密码</div>
+        </el-form-item>
         <el-form-item label="访问密码">
           <el-input
             v-model="editForm.password"
             placeholder="留空则无需密码"
             show-password
+            :disabled="editForm.is_direct"
           />
         </el-form-item>
         <el-form-item label="过期时间">
@@ -189,6 +198,7 @@ interface Share {
   view_count: number
   download_count: number
   max_downloads: number
+  is_direct: boolean
   created_at: string
 }
 
@@ -207,7 +217,8 @@ const editForm = ref({
   expire_at: null as Date | null,
   description: '',
   is_active: true,
-  max_downloads: 0
+  max_downloads: 0,
+  is_direct: false
 })
 
 // QR Code
@@ -230,16 +241,16 @@ async function loadShares() {
   }
 }
 
-function getShareUrl(code: string): string {
-  return `${window.location.origin}/s/${code}`
+function getShareUrl(code: string, isDirect = false): string {
+  return `${window.location.origin}/${isDirect ? 'f' : 's'}/${code}`
 }
 
-function openLink(code: string) {
-  window.open(getShareUrl(code), '_blank')
+function openLink(code: string, isDirect = false) {
+  window.open(getShareUrl(code, isDirect), '_blank')
 }
 
-function copyLink(code: string) {
-  const url = getShareUrl(code)
+function copyLink(code: string, isDirect = false) {
+  const url = getShareUrl(code, isDirect)
   navigator.clipboard.writeText(url)
   ElMessage.success('链接已复制')
 }
@@ -252,7 +263,8 @@ function openEditDialog(share: Share) {
     expire_at: share.expire_at ? new Date(share.expire_at) : null,
     description: share.description,
     is_active: share.is_active,
-    max_downloads: share.max_downloads || 0
+    max_downloads: share.max_downloads || 0,
+    is_direct: share.is_direct || false
   }
   editDialogVisible.value = true
 }
@@ -262,10 +274,11 @@ async function updateShare() {
   try {
     const data: any = {
       share_code: editForm.value.share_code,
-      password: editForm.value.password,
+      password: editForm.value.is_direct ? '' : editForm.value.password,
       description: editForm.value.description,
       is_active: editForm.value.is_active,
-      max_downloads: editForm.value.max_downloads
+      max_downloads: editForm.value.max_downloads,
+      is_direct: editForm.value.is_direct
     }
     if (editForm.value.expire_at) {
       data.expire_at = editForm.value.expire_at.toISOString()
@@ -344,6 +357,22 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.type-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border: 1px solid black;
+  border-radius: 2px;
+}
+.type-badge.direct {
+  background: var(--acid-green, #ccff00);
+  color: black;
+}
+.type-badge.share {
+  background: #f0f0f0;
+  color: #666;
 }
 
 .text-muted {

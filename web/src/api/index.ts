@@ -94,6 +94,8 @@ export const shareApi = {
         password?: string
         expire_at?: string
         description?: string
+        max_downloads?: number
+        is_direct?: boolean
     }) => api.post('/shares', data),
     batchCreate: (items: Array<{
         target_type: 'file' | 'folder'

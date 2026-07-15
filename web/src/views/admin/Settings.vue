@@ -286,6 +286,43 @@
           </div>
         </div>
       </el-card>
+
+      <!-- 直连设置 -->
+      <el-card class="masonry-item">
+        <template #header>
+          <span class="card-header">直连设置</span>
+        </template>
+
+        <el-form :model="directForm" label-width="130px" size="small">
+          <el-form-item label="Referer 白名单">
+            <el-input
+              v-model="directForm.direct_referer_whitelist"
+              type="textarea"
+              :rows="2"
+              placeholder="逗号分隔域名，如 example.com,blog.foo.com；留空=不限制"
+            />
+            <div class="form-tip">仅限这些域名的页面可嵌入直连；子域自动放行。留空则不限制。</div>
+          </el-form-item>
+          <el-form-item label="允许空 Referer">
+            <el-switch v-model="directForm.direct_allow_empty_referer" />
+            <div class="form-tip">直接打开链接、微信/QQ 等无 Referer 场景。建议开启，否则会误伤。</div>
+          </el-form-item>
+          <el-form-item label="每 IP 限速">
+            <el-input-number v-model="directForm.direct_rate_limit" :min="0" :max="100000" :step="10" style="width: 140px;" />
+            <span style="margin-left: 8px;">次/分钟</span>
+            <div class="form-tip">0 表示不限速。</div>
+          </el-form-item>
+          <el-form-item label="拒绝时返回占位图">
+            <el-switch v-model="directForm.direct_reject_placeholder" />
+            <div class="form-tip">被拦截时返回一张提示图，而非报错，便于看出裂图原因。</div>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="success" @click="saveDirectSettings" :loading="saving">
+              保存直连设置
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
     </div>
 
     <!-- 通知记录（全宽） -->
@@ -384,6 +421,14 @@ const passwordForm = ref({
   confirm_password: ''
 })
 
+// 直连（图床/外链）设置
+const directForm = ref({
+  direct_referer_whitelist: '',
+  direct_allow_empty_referer: true,
+  direct_rate_limit: 60,
+  direct_reject_placeholder: true
+})
+
 // 监控相关
 const monitorForm = ref({
   monitor_enabled: false,
@@ -452,6 +497,12 @@ async function loadSettings() {
       login_system_name: res.data.login_system_name || '',
       share_footer: res.data.share_footer || ''
     }
+    directForm.value = {
+      direct_referer_whitelist: res.data.direct_referer_whitelist || '',
+      direct_allow_empty_referer: res.data.direct_allow_empty_referer ?? true,
+      direct_rate_limit: res.data.direct_rate_limit ?? 60,
+      direct_reject_placeholder: res.data.direct_reject_placeholder ?? true
+    }
   } catch (error) {
     // 错误已处理
   }
@@ -497,6 +548,18 @@ async function saveSiteSettings() {
   try {
     await settingsApi.update(siteForm.value)
     ElMessage.success('站点设置已保存')
+  } catch (error) {
+    // 错误已处理
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveDirectSettings() {
+  saving.value = true
+  try {
+    await settingsApi.update(directForm.value)
+    ElMessage.success('直连设置已保存')
   } catch (error) {
     // 错误已处理
   } finally {

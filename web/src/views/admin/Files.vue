@@ -252,6 +252,14 @@
                 <div class="upload-item-status" :class="item.status">
                   {{ item.status === 'uploading' ? '上传中' : item.status === 'success' ? '成功' : '失败' }}
                 </div>
+                <button
+                  v-if="item.status === 'success' && item.file"
+                  class="btn-brutal"
+                  style="padding: 6px 12px; font-size: 12px; margin-top: 6px;"
+                  @click="createDirectFromUpload(item.file!)"
+                >
+                  创建直连并复制
+                </button>
               </div>
            </div>
            <div class="form-actions-brutal" v-if="!uploading">
@@ -284,15 +292,23 @@
            </div>
 
            <div class="form-group">
+              <label class="brutal-label-tag">直连模式_DIRECT</label>
+              <label class="direct-toggle">
+                 <input type="checkbox" v-model="shareForm.is_direct">
+                 <span>图床 / 外链嵌入（生成 /f/ 链接，不支持密码）</span>
+              </label>
+           </div>
+
+           <div class="form-group">
               <label class="brutal-label-tag">访问密码_PASS</label>
-              <input v-model="shareForm.password" class="brutal-input-reset" type="password" placeholder="留空则公开 (Public)">
+              <input v-model="shareForm.password" class="brutal-input-reset" type="password" :disabled="shareForm.is_direct" :placeholder="shareForm.is_direct ? '直连模式不支持密码' : '留空则公开 (Public)'">
            </div>
 
            <div class="form-group">
               <label class="brutal-label-tag">过期时间_EXPIRE</label>
               <div class="date-picker-wrapper-brutal">
-                 <el-date-picker 
-                   v-model="shareForm.expire_at" 
+                 <el-date-picker
+                   v-model="shareForm.expire_at"
                    type="datetime" 
                    placeholder="选择过期时间 (Optional)" 
                    style="width: 100% !important; height: 42px;"
@@ -548,7 +564,18 @@
            </div>
 
            <!-- 操作按钮组 (经过优化的配色) -->
-           <div class="action-buttons-row">
+           <div v-if="shareResult.is_direct" class="action-buttons-row" style="flex-wrap: wrap;">
+              <button class="btn-brutal btn-copy" @click="copyText(shareResult.url, '直连地址')">
+                 <el-icon><CopyDocument /></el-icon> 复制 URL
+              </button>
+              <button class="btn-brutal btn-open" @click="copyDirectMarkdown()">
+                 复制 Markdown
+              </button>
+              <button class="btn-brutal btn-open" @click="copyDirectHtml()">
+                 复制 HTML
+              </button>
+           </div>
+           <div v-else class="action-buttons-row">
               <button class="btn-brutal btn-copy" @click="copyLink(shareResult.code)">
                  <el-icon><CopyDocument /></el-icon> 复制链接
               </button>
@@ -611,6 +638,7 @@ const uploadList = ref<Array<{
   name: string
   progress: number
   status: 'uploading' | 'success' | 'failed'
+  file?: FileInfo
 }>>([])
 
 function triggerUpload() {
@@ -681,7 +709,7 @@ async function handleFileSelected(e: Event) {
       }
 
       pollPromise = pollProgress()
-      await fileApi.upload(
+      const uploadResp: any = await fileApi.upload(
         file,
         currentDirId.value || '0',
         (percent) => {
@@ -698,6 +726,7 @@ async function handleFileSelected(e: Event) {
 
       uploadItem.status = 'success'
       uploadItem.progress = 100
+      uploadItem.file = uploadResp?.data
       success++
     } catch (error) {
       stopPolling = true
@@ -821,7 +850,8 @@ const shareForm = ref({
   password: '',
   expire_at: null as Date | null,
   description: '',
-  max_downloads: 0
+  max_downloads: 0,
+  is_direct: false
 })
 
 // 批量分享
@@ -841,7 +871,9 @@ const shareResult = ref({
   url: '',
   code: '',
   password: '',
-  expire: ''
+  expire: '',
+  is_direct: false,
+  name: ''
 })
 
 function closeShareResult() {
@@ -957,7 +989,8 @@ function openShareDialog(file: FileInfo) {
     password: '',
     expire_at: null,
     description: '',
-    max_downloads: 0
+    max_downloads: 0,
+    is_direct: false
   }
   shareDialogVisible.value = true
 }
@@ -1065,17 +1098,24 @@ async function createShare() {
     if (typeof shareForm.value.max_downloads === 'number') {
       data.max_downloads = shareForm.value.max_downloads > 0 ? shareForm.value.max_downloads : 0
     }
+    data.is_direct = shareForm.value.is_direct
+    if (data.is_direct) {
+      data.password = ''
+    }
 
     const res = await shareApi.create(data)
-    
+
     // 成功后显示自定义 Brutalist 弹窗，不再使用 Toast
+    const isDirect = !!res.data.is_direct
     shareResult.value = {
-      url: `${window.location.origin}/s/${res.data.share_code}`,
+      url: `${window.location.origin}/${isDirect ? 'f' : 's'}/${res.data.share_code}`,
       code: res.data.share_code,
       password: data.password || '',
-      expire: data.expire_at || ''
+      expire: data.expire_at || '',
+      is_direct: isDirect,
+      name: res.data.target_name || shareForm.value.target_name
     }
-    
+
     shareDialogVisible.value = false
     shareResultVisible.value = true
     
@@ -1083,6 +1123,22 @@ async function createShare() {
     // 错误已处理
   } finally {
     creating.value = false
+  }
+}
+
+async function createDirectFromUpload(file: FileInfo) {
+  try {
+    const res = await shareApi.create({
+      target_type: 'file',
+      target_id: file.fid || file.id,
+      target_name: file.name,
+      is_direct: true
+    })
+    const url = `${window.location.origin}/f/${res.data.share_code}`
+    await navigator.clipboard.writeText(url)
+    uiStore.showToast('success', '直连已创建', '链接已复制到剪贴板')
+  } catch {
+    // 错误已处理
   }
 }
 
@@ -1142,6 +1198,19 @@ function copyLink(code: string) {
   const url = getShareUrl(code)
   navigator.clipboard.writeText(url)
   uiStore.showToast('success', '复制成功', '链接已复制到剪贴板')
+}
+
+function copyText(text: string, label: string) {
+  navigator.clipboard.writeText(text)
+  uiStore.showToast('success', '复制成功', `${label}已复制到剪贴板`)
+}
+
+function copyDirectMarkdown() {
+  copyText(`![${shareResult.value.name}](${shareResult.value.url})`, 'Markdown')
+}
+
+function copyDirectHtml() {
+  copyText(`<img src="${shareResult.value.url}" alt="${shareResult.value.name}">`, 'HTML')
 }
 
 function copyAllLinks() {
@@ -1404,6 +1473,21 @@ onMounted(() => {
   text-transform: uppercase;
   box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
   transform: skewX(-5deg);
+}
+
+.direct-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: monospace;
+  font-size: 13px;
+  cursor: pointer;
+}
+.direct-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: black;
+  cursor: pointer;
 }
 
 .static-value-box {
