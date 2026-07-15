@@ -61,6 +61,9 @@ func registerShareRoutes(r *gin.Engine, h *handler.Handler, dist distInfo) {
 	r.GET("/s/:code/preview/:fileId", h.PreviewShare)
 	r.GET("/s/:code/files", h.GetShareFiles)
 	r.GET("/s/:code/info", h.GetFilePreviewInfo)
+
+	// 直连（图床/视频床/文件床）入口，稳定 URL 可直接嵌入 <img>/<video>/Markdown
+	r.GET("/f/:code", h.DirectLink)
 }
 
 func registerAdminRoutes(r *gin.Engine, h *handler.Handler) {

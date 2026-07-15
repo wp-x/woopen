@@ -49,6 +49,8 @@ type Handler struct {
 	adminPassword       string
 	monitorService      MonitorServiceInterface
 	listCache           ListCache
+	directCache         DirectURLCache
+	directLimiter       *directRateLimiter
 
 	// uploadProgress holds best-effort server-side upload progress keyed by upload_id.
 	// Used by the admin UI polling endpoint to show real progress during Upload2C.
@@ -81,6 +83,8 @@ func NewHandler(opts HandlerOptions) *Handler {
 		wopanClient:         opts.WopanClient,
 		adminPassword:       opts.AdminPassword,
 		listCache:           opts.ListCache,
+		directCache:         NewDirectURLCache(DefaultDirectURLCacheTTL),
+		directLimiter:       newDirectRateLimiter(),
 	}
 }
 
@@ -439,17 +443,24 @@ func (h *Handler) CreateShare(c *gin.Context) {
 		}
 	}
 
+	// 直连模式无法交互输入密码，强制清空
+	password := req.Password
+	if req.IsDirect {
+		password = ""
+	}
+
 	share := &model.Share{
 		ShareCode:    shareCode,
 		TargetType:   req.TargetType,
 		TargetID:     req.TargetID,
 		TargetPath:   req.TargetPath,
 		TargetName:   req.TargetName,
-		Password:     req.Password,
+		Password:     password,
 		ExpireAt:     expireAt,
 		Description:  req.Description,
 		IsActive:     true,
 		MaxDownloads: req.MaxDownloads,
+		IsDirect:     req.IsDirect,
 	}
 
 	if err := h.shareRepo.Create(share); err != nil {
@@ -513,6 +524,7 @@ func (h *Handler) UpdateShare(c *gin.Context) {
 		Description  string `json:"description"`
 		IsActive     *bool  `json:"is_active"`
 		MaxDownloads *int64 `json:"max_downloads"`
+		IsDirect     *bool  `json:"is_direct"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.APIResponse{
@@ -541,6 +553,13 @@ func (h *Handler) UpdateShare(c *gin.Context) {
 	}
 	if req.MaxDownloads != nil {
 		share.MaxDownloads = *req.MaxDownloads
+	}
+	if req.IsDirect != nil {
+		share.IsDirect = *req.IsDirect
+	}
+	// 直连模式无法交互输入密码，强制清空
+	if share.IsDirect {
+		share.Password = ""
 	}
 
 	if req.ExpireAt != "" {
@@ -863,6 +882,11 @@ func (h *Handler) GetSettings(c *gin.Context) {
 			"login_system_name": settings.LoginSystemName,
 			"share_footer":      settings.ShareFooter,
 			"initialized":       h.wopanClient.IsInitialized(),
+
+			"direct_referer_whitelist":   settings.DirectRefererWhitelist,
+			"direct_allow_empty_referer": settings.DirectAllowEmptyReferer,
+			"direct_rate_limit":          settings.DirectRateLimit,
+			"direct_reject_placeholder":  settings.DirectRejectPlaceholder,
 		},
 	})
 }
@@ -944,6 +968,18 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	}
 	if v, ok := raw["share_footer"].(string); ok {
 		settings.ShareFooter = v
+	}
+	if v, ok := raw["direct_referer_whitelist"].(string); ok {
+		settings.DirectRefererWhitelist = v
+	}
+	if v, ok := raw["direct_allow_empty_referer"].(bool); ok {
+		settings.DirectAllowEmptyReferer = v
+	}
+	if v, ok := raw["direct_rate_limit"].(float64); ok {
+		settings.DirectRateLimit = int(v)
+	}
+	if v, ok := raw["direct_reject_placeholder"].(bool); ok {
+		settings.DirectRejectPlaceholder = v
 	}
 
 	if err := h.settingsRepo.Update(settings); err != nil {
