@@ -24,6 +24,9 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 	var monitorInterval sql.NullInt64
 	var barkURL, serverchanKey, telegramBotToken, telegramChatID, pushplusToken, dingtalkWebhook, wecomWebhook sql.NullString
 	var defaultNotifyChannel sql.NullString
+	var directRefererWhitelist sql.NullString
+	var directAllowEmptyReferer, directRejectPlaceholder sql.NullBool
+	var directRateLimit sql.NullInt64
 	err := r.db.QueryRow(`
 		SELECT id, refresh_token, COALESCE(access_token, '') as access_token, root_folder_id, site_title, site_logo,
 			   COALESCE(login_title, 'WoOpen_Auth_v10.exe') as login_title,
@@ -42,7 +45,11 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 			   COALESCE(telegram_chat_id, '') as telegram_chat_id,
 			   COALESCE(pushplus_token, '') as pushplus_token,
 			   COALESCE(dingtalk_webhook, '') as dingtalk_webhook,
-			   COALESCE(wecom_webhook, '') as wecom_webhook
+			   COALESCE(wecom_webhook, '') as wecom_webhook,
+			   COALESCE(direct_referer_whitelist, '') as direct_referer_whitelist,
+			   COALESCE(direct_allow_empty_referer, 1) as direct_allow_empty_referer,
+			   COALESCE(direct_rate_limit, 60) as direct_rate_limit,
+			   COALESCE(direct_reject_placeholder, 1) as direct_reject_placeholder
 		FROM settings WHERE id = 1
 	`).Scan(
 		&settings.ID,
@@ -68,6 +75,10 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 		&pushplusToken,
 		&dingtalkWebhook,
 		&wecomWebhook,
+		&directRefererWhitelist,
+		&directAllowEmptyReferer,
+		&directRateLimit,
+		&directRejectPlaceholder,
 	)
 	if err != nil {
 		return nil, err
@@ -130,6 +141,24 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 	if wecomWebhook.Valid {
 		settings.WecomWebhook = wecomWebhook.String
 	}
+	if directRefererWhitelist.Valid {
+		settings.DirectRefererWhitelist = directRefererWhitelist.String
+	}
+	if directAllowEmptyReferer.Valid {
+		settings.DirectAllowEmptyReferer = directAllowEmptyReferer.Bool
+	} else {
+		settings.DirectAllowEmptyReferer = true
+	}
+	if directRateLimit.Valid {
+		settings.DirectRateLimit = int(directRateLimit.Int64)
+	} else {
+		settings.DirectRateLimit = 60
+	}
+	if directRejectPlaceholder.Valid {
+		settings.DirectRejectPlaceholder = directRejectPlaceholder.Bool
+	} else {
+		settings.DirectRejectPlaceholder = true
+	}
 	return &settings, nil
 }
 
@@ -159,6 +188,10 @@ func (r *SettingsRepository) Update(settings *model.Settings) error {
 			pushplus_token = ?,
 			dingtalk_webhook = ?,
 			wecom_webhook = ?,
+			direct_referer_whitelist = ?,
+			direct_allow_empty_referer = ?,
+			direct_rate_limit = ?,
+			direct_reject_placeholder = ?,
 			updated_at = ?
 		WHERE id = 1
 	`,
@@ -184,6 +217,10 @@ func (r *SettingsRepository) Update(settings *model.Settings) error {
 		settings.PushplusToken,
 		settings.DingtalkWebhook,
 		settings.WecomWebhook,
+		settings.DirectRefererWhitelist,
+		settings.DirectAllowEmptyReferer,
+		settings.DirectRateLimit,
+		settings.DirectRejectPlaceholder,
 		time.Now(),
 	)
 	return err

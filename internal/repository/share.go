@@ -19,8 +19,8 @@ func NewShareRepository(db *sql.DB) *ShareRepository {
 // Create 创建分享
 func (r *ShareRepository) Create(share *model.Share) error {
 	result, err := r.db.Exec(`
-		INSERT INTO shares (share_code, target_type, target_id, target_path, target_name, password, expire_at, description, is_active, max_downloads)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO shares (share_code, target_type, target_id, target_path, target_name, password, expire_at, description, is_active, max_downloads, is_direct)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		share.ShareCode,
 		share.TargetType,
@@ -32,6 +32,7 @@ func (r *ShareRepository) Create(share *model.Share) error {
 		share.Description,
 		share.IsActive,
 		share.MaxDownloads,
+		share.IsDirect,
 	)
 	if err != nil {
 		return err
@@ -51,7 +52,7 @@ func (r *ShareRepository) GetByCode(code string) (*model.Share, error) {
 	var maxDownloads sql.NullInt64
 	err := r.db.QueryRow(`
 		SELECT id, share_code, target_type, target_id, target_path, target_name,
-			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads
+			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads, is_direct
 		FROM shares WHERE share_code = ?
 	`, code).Scan(
 		&share.ID,
@@ -68,6 +69,7 @@ func (r *ShareRepository) GetByCode(code string) (*model.Share, error) {
 		&share.ViewCount,
 		&share.DownloadCount,
 		&maxDownloads,
+		&share.IsDirect,
 	)
 	if err != nil {
 		return nil, err
@@ -88,7 +90,7 @@ func (r *ShareRepository) GetByID(id int64) (*model.Share, error) {
 	var maxDownloads sql.NullInt64
 	err := r.db.QueryRow(`
 		SELECT id, share_code, target_type, target_id, target_path, target_name,
-			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads
+			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads, is_direct
 		FROM shares WHERE id = ?
 	`, id).Scan(
 		&share.ID,
@@ -105,6 +107,7 @@ func (r *ShareRepository) GetByID(id int64) (*model.Share, error) {
 		&share.ViewCount,
 		&share.DownloadCount,
 		&maxDownloads,
+		&share.IsDirect,
 	)
 	if err != nil {
 		return nil, err
@@ -131,7 +134,7 @@ func (r *ShareRepository) List(page, pageSize int) ([]*model.Share, int64, error
 	offset := (page - 1) * pageSize
 	rows, err := r.db.Query(`
 		SELECT id, share_code, target_type, target_id, target_path, target_name,
-			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads
+			   password, expire_at, description, created_at, is_active, view_count, download_count, max_downloads, is_direct
 		FROM shares ORDER BY created_at DESC LIMIT ? OFFSET ?
 	`, pageSize, offset)
 	if err != nil {
@@ -159,6 +162,7 @@ func (r *ShareRepository) List(page, pageSize int) ([]*model.Share, int64, error
 			&share.ViewCount,
 			&share.DownloadCount,
 			&maxDownloads,
+			&share.IsDirect,
 		)
 		if err != nil {
 			return nil, 0, err
@@ -183,7 +187,8 @@ func (r *ShareRepository) Update(share *model.Share) error {
 			expire_at = ?,
 			description = ?,
 			is_active = ?,
-			max_downloads = ?
+			max_downloads = ?,
+			is_direct = ?
 		WHERE id = ?
 	`,
 		share.ShareCode,
@@ -192,6 +197,7 @@ func (r *ShareRepository) Update(share *model.Share) error {
 		share.Description,
 		share.IsActive,
 		share.MaxDownloads,
+		share.IsDirect,
 		share.ID,
 	)
 	return err

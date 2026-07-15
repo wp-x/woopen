@@ -41,6 +41,11 @@ type Settings struct {
 	PushplusToken    string `json:"pushplus_token"`     // PushPlus Token
 	DingtalkWebhook  string `json:"dingtalk_webhook"`   // 钉钉 Webhook
 	WecomWebhook     string `json:"wecom_webhook"`      // 企业微信 Webhook
+	// 直连（图床/外链）配置
+	DirectRefererWhitelist  string `json:"direct_referer_whitelist"`   // 逗号分隔域名，空=不限制
+	DirectAllowEmptyReferer bool   `json:"direct_allow_empty_referer"` // 允许空 Referer（默认开）
+	DirectRateLimit         int    `json:"direct_rate_limit"`          // 每 IP 每分钟上限，0=不限
+	DirectRejectPlaceholder bool   `json:"direct_reject_placeholder"`  // 拒绝时返回占位图
 }
 
 // MonitorStatus 监控状态
@@ -78,6 +83,7 @@ type Share struct {
 	ViewCount     int64      `json:"view_count"`     // 访问次数
 	DownloadCount int64      `json:"download_count"` // 下载次数
 	MaxDownloads  int64      `json:"max_downloads"`  // 最大下载次数，0表示不限制
+	IsDirect      bool       `json:"is_direct"`      // 直连模式（图床/外链），不支持密码
 }
 
 // AccessLog 访问日志
@@ -115,6 +121,7 @@ type CreateShareRequest struct {
 	ExpireAt     string `json:"expire_at"` // ISO8601 格式
 	Description  string `json:"description"`
 	MaxDownloads int64  `json:"max_downloads"` // 最大下载次数，0表示不限制
+	IsDirect     bool   `json:"is_direct"`     // 直连模式（图床/外链）
 }
 
 // LoginRequest 登录请求
