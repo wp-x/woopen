@@ -48,6 +48,10 @@ func registerPublicRoutes(r *gin.Engine, h *handler.Handler, dist distInfo) {
 func registerShareRoutes(r *gin.Engine, h *handler.Handler, dist distInfo) {
 	// 分享访问
 	r.GET("/s/:code", func(c *gin.Context) {
+		// 同一 URL 按 Accept 分流 HTML/JSON：禁止缓存，否则浏览器/CDN 会把
+		// 缓存的 HTML 喂给 XHR，前端表现为「链接失效或不存在」
+		c.Header("Vary", "Accept")
+		c.Header("Cache-Control", "no-store")
 		if wantsHTML(c) {
 			serveIndex(c, dist.dir, dist.exists)
 			return
