@@ -81,7 +81,14 @@ func setupRouter(opts routeOptions) *gin.Engine {
 	return r
 }
 
-func newWebDAVHandler(wopanClient *wopan.Client, adminPassword string) http.Handler {
+// webdavWriteMethods 是会修改云盘内容的方法，只读模式下一律拒绝。
+var webdavWriteMethods = map[string]bool{
+	"PUT": true, "DELETE": true, "MKCOL": true,
+	"MOVE": true, "COPY": true, "PROPPATCH": true,
+	"LOCK": true, "UNLOCK": true,
+}
+
+func newWebDAVHandler(wopanClient *wopan.Client, settingsRepo *repository.SettingsRepository, adminPassword string) http.Handler {
 	davFS := webdav.NewWopanFS(wopanClient)
 	dav := &xwebdav.Handler{
 		Prefix:     "/dav",
@@ -96,6 +103,14 @@ func newWebDAVHandler(wopanClient *wopan.Client, adminPassword string) http.Hand
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[WebDAV] %s %s", r.Method, r.URL.RequestURI())
 
+		settings, _ := settingsRepo.Get()
+
+		// 功能开关：关闭时整体不可用
+		if settings != nil && !settings.WebdavEnabled {
+			http.Error(w, "WebDAV disabled", http.StatusNotFound)
+			return
+		}
+
 		// 所有响应都携带 DAV 能力头，让客户端识别为 WebDAV 服务
 		w.Header().Set("DAV", "1, 2")
 		w.Header().Set("MS-Author-Via", "DAV")
@@ -106,7 +121,32 @@ func newWebDAVHandler(wopanClient *wopan.Client, adminPassword string) http.Hand
 			return
 		}
 
-		if !authenticateWebDAV(w, r, adminPassword) {
+		user, pass := "admin", adminPassword
+		readonly := false
+		if settings != nil {
+			user = settings.WebdavUsername
+			if settings.WebdavPassword != "" {
+				pass = settings.WebdavPassword
+			}
+			readonly = settings.WebdavReadonly
+		}
+
+		if !authenticateWebDAV(w, r, user, pass) {
+			return
+		}
+
+		// 只读模式拒绝一切写操作
+		if readonly && webdavWriteMethods[r.Method] {
+			http.Error(w, "WebDAV is read-only", http.StatusForbidden)
+			return
+		}
+
+		// 挂载卡死的主因：部分客户端对根目录发起 Depth:infinity PROPFIND，
+		// 会递归遍历整盘。返回 403 + finite-depth，客户端会退回 Depth:1。
+		if r.Method == "PROPFIND" && strings.EqualFold(r.Header.Get("Depth"), "infinity") {
+			w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`<?xml version="1.0" encoding="utf-8"?><D:error xmlns:D="DAV:"><D:propfind-finite-depth/></D:error>`))
 			return
 		}
 
@@ -141,7 +181,7 @@ func newWebDAVHandler(wopanClient *wopan.Client, adminPassword string) http.Hand
 			}
 
 			if resolved.Info != nil {
-				downloadURL, err := wopanClient.GetDownloadURL(resolved.ID)
+				downloadURL, err := davFS.DownloadURL(resolved.ID)
 				if err != nil {
 					http.Error(w, "WebDAV redirect failed: "+err.Error(), http.StatusBadGateway)
 					return
@@ -155,7 +195,7 @@ func newWebDAVHandler(wopanClient *wopan.Client, adminPassword string) http.Hand
 	})
 }
 
-func authenticateWebDAV(w http.ResponseWriter, r *http.Request, adminPassword string) bool {
+func authenticateWebDAV(w http.ResponseWriter, r *http.Request, wantUser, wantPass string) bool {
 	auth := getWebDAVAuthHeader(r)
 	if auth == "" {
 		log.Printf("[WebDAV] auth missing: %s %s ua=%q", r.Method, r.URL.Path, r.UserAgent())
@@ -173,7 +213,7 @@ func authenticateWebDAV(w http.ResponseWriter, r *http.Request, adminPassword st
 		return true
 	}
 	user, pass, ok := parseBasicAuth(auth)
-	if !ok || user != "admin" || pass != adminPassword {
+	if !ok || user != wantUser || pass != wantPass {
 		log.Printf("[WebDAV] auth failed: user=%q ok=%v", user, ok)
 		davChallenge(w)
 		return false

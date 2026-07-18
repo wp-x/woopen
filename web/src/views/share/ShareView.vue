@@ -655,13 +655,8 @@ onUnmounted(() => {
 }
 
 .compact-header {
-    flex-direction: column; /* Stack vertically for compact view */
-    align-items: flex-start;
     padding-bottom: 10px; /* Tighter padding */
     margin-bottom: 15px;
-}
-.compact-header .file-icon-box {
-    margin-bottom: 10px;
 }
 
 .file-icon-box {

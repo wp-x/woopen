@@ -111,6 +111,7 @@ func (h *Handler) GetSiteConfig(c *gin.Context) {
 			Message: "success",
 			Data: gin.H{
 				"site_title":        "WoOpen",
+				"login_username":    "Administrator",
 				"login_title":       "WoOpen_Auth_v10.exe",
 				"login_avatar":      "💀",
 				"login_role_tag":    "ROLE: ADMIN",
@@ -131,6 +132,7 @@ func (h *Handler) GetSiteConfig(c *gin.Context) {
 		Message: "success",
 		Data: gin.H{
 			"site_title":        settings.SiteTitle,
+			"login_username":    settings.LoginUsername,
 			"login_title":       settings.LoginTitle,
 			"login_avatar":      settings.LoginAvatar,
 			"login_role_tag":    settings.LoginRoleTag,
@@ -139,6 +141,7 @@ func (h *Handler) GetSiteConfig(c *gin.Context) {
 			"share_footer":      settings.ShareFooter,
 			"site_url":          baseURL,
 			"webdav_url":        baseURL + "/dav/",
+			// 账号名属凭据的一部分，不在无鉴权的公开接口暴露；WebDAV 配置从受鉴权的 GetSettings 拉取。
 		},
 	})
 }
@@ -883,6 +886,7 @@ func (h *Handler) GetSettings(c *gin.Context) {
 			"root_folder_id":    settings.RootFolderID,
 			"site_title":        settings.SiteTitle,
 			"site_logo":         settings.SiteLogo,
+			"login_username":    settings.LoginUsername,
 			"login_title":       settings.LoginTitle,
 			"login_avatar":      settings.LoginAvatar,
 			"login_role_tag":    settings.LoginRoleTag,
@@ -895,6 +899,11 @@ func (h *Handler) GetSettings(c *gin.Context) {
 			"direct_allow_empty_referer": settings.DirectAllowEmptyReferer,
 			"direct_rate_limit":          settings.DirectRateLimit,
 			"direct_reject_placeholder":  settings.DirectRejectPlaceholder,
+
+			"webdav_enabled":      settings.WebdavEnabled,
+			"webdav_username":     settings.WebdavUsername,
+			"webdav_readonly":     settings.WebdavReadonly,
+			"webdav_password_set": settings.WebdavPassword != "",
 		},
 	})
 }
@@ -959,6 +968,9 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	if v, ok := raw["site_logo"].(string); ok {
 		settings.SiteLogo = v
 	}
+	if v, ok := raw["login_username"].(string); ok {
+		settings.LoginUsername = v
+	}
 	if v, ok := raw["login_title"].(string); ok {
 		settings.LoginTitle = v
 	}
@@ -988,6 +1000,19 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	}
 	if v, ok := raw["direct_reject_placeholder"].(bool); ok {
 		settings.DirectRejectPlaceholder = v
+	}
+	if v, ok := raw["webdav_enabled"].(bool); ok {
+		settings.WebdavEnabled = v
+	}
+	if v, ok := raw["webdav_username"].(string); ok && v != "" {
+		settings.WebdavUsername = v
+	}
+	// 空字符串表示保持原密码，仅在传入非空且非掩码时更新
+	if v, ok := raw["webdav_password"].(string); ok && v != "" && !containsMask(v) {
+		settings.WebdavPassword = v
+	}
+	if v, ok := raw["webdav_readonly"].(bool); ok {
+		settings.WebdavReadonly = v
 	}
 
 	if err := h.settingsRepo.Update(settings); err != nil {

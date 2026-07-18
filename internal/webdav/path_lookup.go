@@ -146,12 +146,23 @@ func (fs *WopanFS) listAllInDirCached(ctx context.Context, dirID string) ([]*mod
 	if cached, ok := fs.getDirCacheEntry(dirID); ok {
 		return cached, nil
 	}
-	files, err := fs.listAllInDir(ctx, dirID)
+	// singleflight：并发访问同一目录只打一次上游，其余等待复用结果。
+	v, err, _ := fs.listSF.Do(dirID, func() (interface{}, error) {
+		// 双重检查：等锁期间可能已被前一个请求填充缓存。
+		if cached, ok := fs.getDirCacheEntry(dirID); ok {
+			return cached, nil
+		}
+		files, err := fs.listAllInDir(ctx, dirID)
+		if err != nil {
+			return nil, err
+		}
+		fs.setDirCacheEntry(dirID, files)
+		return cloneFileInfos(files), nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	fs.setDirCacheEntry(dirID, files)
-	return cloneFileInfos(files), nil
+	return cloneFileInfos(v.([]*model.FileInfo)), nil
 }
 
 func (fs *WopanFS) primeChildPathCache(parentPath, parentID string, files []*model.FileInfo) {

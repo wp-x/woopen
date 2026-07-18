@@ -33,7 +33,7 @@ func main() {
 	r := setupRouter(routeOptions{
 		handler: h,
 	})
-	davHandler := newWebDAVHandler(wopanClient, cfg.AdminPassword)
+	davHandler := newWebDAVHandler(wopanClient, repos.settings, cfg.AdminPassword)
 	startHTTPServer(r, davHandler, cfg.Port)
 }
 

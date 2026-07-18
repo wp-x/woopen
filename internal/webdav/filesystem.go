@@ -20,6 +20,14 @@ type WopanFS struct {
 	dirCache    map[string]*dirCacheEntry
 	pathCacheMu sync.RWMutex
 	pathCache   map[string]*pathCacheEntry
+
+	// singleflight 合并并发的相同上游请求，避免缓存击穿把联通 API 打爆。
+	listSF singleGroup
+	urlSF  singleGroup
+
+	// 下载链接缓存：联通链接有一定有效期，短 TTL 复用可大幅减少 GetDownloadURL 调用。
+	urlCacheMu sync.RWMutex
+	urlCache   map[string]urlCacheEntry
 }
 
 // NewWopanFS 创建新的 WebDAV 文件系统
@@ -28,7 +36,43 @@ func NewWopanFS(client *wopan.Client) *WopanFS {
 		client:    client,
 		dirCache:  make(map[string]*dirCacheEntry),
 		pathCache: make(map[string]*pathCacheEntry),
+		urlCache:  make(map[string]urlCacheEntry),
 	}
+}
+
+type urlCacheEntry struct {
+	url     string
+	expires time.Time
+}
+
+// urlCacheTTL 保守取值，远小于联通下载链接实际有效期，避免返回过期链接。
+const urlCacheTTL = 8 * time.Minute
+
+// DownloadURL 返回文件下载直链，带缓存 + singleflight 去重。
+// WebDAV 客户端会对同一文件密集发起 HEAD/GET，直连每次都锁 metaMu 打上游，
+// 这里合并并短时缓存，是挂载不卡的关键。
+func (fs *WopanFS) DownloadURL(fileID string) (string, error) {
+	fs.urlCacheMu.RLock()
+	e, ok := fs.urlCache[fileID]
+	fs.urlCacheMu.RUnlock()
+	if ok && time.Now().Before(e.expires) {
+		return e.url, nil
+	}
+
+	v, err, _ := fs.urlSF.Do(fileID, func() (interface{}, error) {
+		url, err := fs.client.GetDownloadURL(fileID)
+		if err != nil {
+			return "", err
+		}
+		fs.urlCacheMu.Lock()
+		fs.urlCache[fileID] = urlCacheEntry{url: url, expires: time.Now().Add(urlCacheTTL)}
+		fs.urlCacheMu.Unlock()
+		return url, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return v.(string), nil
 }
 
 // Mkdir 创建目录

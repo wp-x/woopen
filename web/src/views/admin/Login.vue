@@ -34,7 +34,7 @@
           <h2 class="form-title">身份验证程序</h2>
           
           <label class="brutal-label">> 用户名</label>
-          <input type="text" value="Administrator" readonly class="brutal-input readonly">
+          <input type="text" :value="siteConfig.login_username" readonly class="brutal-input readonly">
           
           <label class="brutal-label">> 授权时长</label>
           <div class="expire-options">
@@ -92,6 +92,7 @@ const loginBtn = ref<HTMLButtonElement | null>(null)
 
 // 站点配置
 const siteConfig = ref({
+  login_username: 'Administrator',
   login_title: 'WoOpen_Auth_v10.exe',
   login_avatar: '💀',
   login_role_tag: 'ROLE: ADMIN',
@@ -117,6 +118,7 @@ async function loadSiteConfig() {
     const res = await publicApi.getSiteConfig()
     if (res.code === 0 && res.data) {
       siteConfig.value = {
+        login_username: res.data.login_username || 'Administrator',
         login_title: res.data.login_title || 'WoOpen_Auth_v10.exe',
         login_avatar: res.data.login_avatar || '💀',
         login_role_tag: res.data.login_role_tag || 'ROLE: ADMIN',
@@ -249,7 +251,7 @@ onMounted(() => {
 
 #view-login {
     width: 800px;
-    height: 450px;
+    min-height: 450px;
     background: white;
 }
 

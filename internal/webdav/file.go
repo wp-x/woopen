@@ -70,8 +70,8 @@ func (f *wopanFile) Close() error {
 // Read 读取文件内容
 func (f *wopanFile) Read(p []byte) (n int, err error) {
 	if f.reader == nil {
-		// 获取下载链接并创建 reader
-		downloadURL, err := f.fs.client.GetDownloadURL(f.fileID)
+		// 获取下载链接并创建 reader（走缓存 + singleflight）
+		downloadURL, err := f.fs.DownloadURL(f.fileID)
 		if err != nil {
 			return 0, err
 		}

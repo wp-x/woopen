@@ -20,6 +20,7 @@ func NewSettingsRepository(db *sql.DB) *SettingsRepository {
 func (r *SettingsRepository) Get() (*model.Settings, error) {
 	var settings model.Settings
 	var accessToken, loginTitle, loginAvatar, loginRoleTag, loginLevelTag, loginSystemName, shareFooter sql.NullString
+	var loginUsername sql.NullString
 	var monitorEnabled, notifyEnabled sql.NullBool
 	var monitorInterval sql.NullInt64
 	var barkURL, serverchanKey, telegramBotToken, telegramChatID, pushplusToken, dingtalkWebhook, wecomWebhook sql.NullString
@@ -28,6 +29,8 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 	var directRefererWhitelist sql.NullString
 	var directAllowEmptyReferer, directRejectPlaceholder sql.NullBool
 	var directRateLimit sql.NullInt64
+	var webdavEnabled, webdavReadonly sql.NullBool
+	var webdavUsername, webdavPassword sql.NullString
 	err := r.db.QueryRow(`
 		SELECT id, refresh_token, COALESCE(access_token, '') as access_token, root_folder_id, site_title, site_logo,
 			   COALESCE(login_title, 'WoOpen_Auth_v10.exe') as login_title,
@@ -54,7 +57,12 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 			   COALESCE(direct_referer_whitelist, '') as direct_referer_whitelist,
 			   COALESCE(direct_allow_empty_referer, 1) as direct_allow_empty_referer,
 			   COALESCE(direct_rate_limit, 60) as direct_rate_limit,
-			   COALESCE(direct_reject_placeholder, 1) as direct_reject_placeholder
+			   COALESCE(direct_reject_placeholder, 1) as direct_reject_placeholder,
+			   COALESCE(webdav_enabled, 1) as webdav_enabled,
+			   COALESCE(webdav_username, 'admin') as webdav_username,
+			   COALESCE(webdav_password, '') as webdav_password,
+			   COALESCE(webdav_readonly, 0) as webdav_readonly,
+			   COALESCE(login_username, 'Administrator') as login_username
 		FROM settings WHERE id = 1
 	`).Scan(
 		&settings.ID,
@@ -88,6 +96,11 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 		&directAllowEmptyReferer,
 		&directRateLimit,
 		&directRejectPlaceholder,
+		&webdavEnabled,
+		&webdavUsername,
+		&webdavPassword,
+		&webdavReadonly,
+		&loginUsername,
 	)
 	if err != nil {
 		return nil, err
@@ -180,6 +193,27 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 	} else {
 		settings.DirectRejectPlaceholder = true
 	}
+	if webdavEnabled.Valid {
+		settings.WebdavEnabled = webdavEnabled.Bool
+	} else {
+		settings.WebdavEnabled = true
+	}
+	if webdavUsername.Valid && webdavUsername.String != "" {
+		settings.WebdavUsername = webdavUsername.String
+	} else {
+		settings.WebdavUsername = "admin"
+	}
+	if webdavPassword.Valid {
+		settings.WebdavPassword = webdavPassword.String
+	}
+	if webdavReadonly.Valid {
+		settings.WebdavReadonly = webdavReadonly.Bool
+	}
+	if loginUsername.Valid && loginUsername.String != "" {
+		settings.LoginUsername = loginUsername.String
+	} else {
+		settings.LoginUsername = "Administrator"
+	}
 	return &settings, nil
 }
 
@@ -192,6 +226,7 @@ func (r *SettingsRepository) Update(settings *model.Settings) error {
 			root_folder_id = ?,
 			site_title = ?,
 			site_logo = ?,
+			login_username = ?,
 			login_title = ?,
 			login_avatar = ?,
 			login_role_tag = ?,
@@ -217,6 +252,10 @@ func (r *SettingsRepository) Update(settings *model.Settings) error {
 			direct_allow_empty_referer = ?,
 			direct_rate_limit = ?,
 			direct_reject_placeholder = ?,
+			webdav_enabled = ?,
+			webdav_username = ?,
+			webdav_password = ?,
+			webdav_readonly = ?,
 			updated_at = ?
 		WHERE id = 1
 	`,
@@ -225,6 +264,7 @@ func (r *SettingsRepository) Update(settings *model.Settings) error {
 		settings.RootFolderID,
 		settings.SiteTitle,
 		settings.SiteLogo,
+		settings.LoginUsername,
 		settings.LoginTitle,
 		settings.LoginAvatar,
 		settings.LoginRoleTag,
@@ -250,6 +290,10 @@ func (r *SettingsRepository) Update(settings *model.Settings) error {
 		settings.DirectAllowEmptyReferer,
 		settings.DirectRateLimit,
 		settings.DirectRejectPlaceholder,
+		settings.WebdavEnabled,
+		settings.WebdavUsername,
+		settings.WebdavPassword,
+		settings.WebdavReadonly,
 		time.Now(),
 	)
 	return err

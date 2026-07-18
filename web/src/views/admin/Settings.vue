@@ -63,6 +63,9 @@
 
           <el-divider content-position="left">登录界面自定义</el-divider>
 
+          <el-form-item label="用户名">
+            <el-input v-model="siteForm.login_username" placeholder="Administrator" />
+          </el-form-item>
           <el-form-item label="窗口标题">
             <el-input v-model="siteForm.login_title" placeholder="WoOpen_Auth_v10.exe" />
           </el-form-item>
@@ -133,8 +136,12 @@
             <el-switch v-model="monitorForm.monitor_enabled" />
           </el-form-item>
           <el-form-item label="检查间隔">
-            <el-input-number v-model="monitorForm.monitor_interval" :min="60" :max="86400" :step="60" style="width: 140px;" />
-            <span style="margin-left: 8px;">秒</span>
+            <el-input-number v-model="intervalValue" :min="1" :max="999" style="width: 120px;" />
+            <el-select v-model="intervalUnit" style="width: 90px; margin-left: 8px;">
+              <el-option label="分钟" :value="60" />
+              <el-option label="小时" :value="3600" />
+              <el-option label="天" :value="86400" />
+            </el-select>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="checkNow" :loading="checking">
@@ -294,14 +301,41 @@
           <span class="card-header">WebDAV 挂载</span>
         </template>
 
-        <div class="webdav-info">
+        <el-form :model="webdavForm" label-width="110px" size="small">
+          <el-form-item label="启用 WebDAV">
+            <el-switch v-model="webdavForm.webdav_enabled" />
+            <div class="form-tip">关闭后挂载地址不可访问。</div>
+          </el-form-item>
+          <template v-if="webdavForm.webdav_enabled">
+            <el-form-item label="账号">
+              <el-input v-model="webdavForm.webdav_username" placeholder="admin" />
+            </el-form-item>
+            <el-form-item label="密码">
+              <el-input
+                v-model="webdavForm.webdav_password"
+                type="password"
+                show-password
+                :placeholder="webdavPasswordSet ? '已设置，留空则不修改' : '留空则沿用后台管理员密码'"
+              />
+            </el-form-item>
+            <el-form-item label="只读模式">
+              <el-switch v-model="webdavForm.webdav_readonly" />
+              <div class="form-tip">开启后仅可浏览/下载，禁止上传、删除、重命名。挂载更稳定不易卡顿。</div>
+            </el-form-item>
+          </template>
+          <el-form-item>
+            <el-button type="success" @click="saveWebdavSettings" :loading="saving">保存 WebDAV 设置</el-button>
+          </el-form-item>
+        </el-form>
+
+        <div class="webdav-info" v-if="webdavForm.webdav_enabled">
           <div class="form-group-static">
             <span class="label">挂载地址</span>
             <code class="code-block">{{ webdavUrl }}</code>
           </div>
           <div class="form-group-static">
             <span class="label">认证方式</span>
-            <span>Basic Auth（账号固定 <code>admin</code>，密码为后台管理员密码）</span>
+            <span>Basic Auth（账号 <code>{{ webdavForm.webdav_username || 'admin' }}</code>，密码为上方设置的 WebDAV 密码）</span>
           </div>
 
           <el-divider content-position="left">挂载方法</el-divider>
@@ -310,10 +344,10 @@
             <el-collapse-item title="Windows" name="win">
               <p>方法一：打开「此电脑」→「映射网络驱动器」，输入地址。</p>
               <p>方法二：命令行：</p>
-              <code class="code-block">net use Z: {{ webdavUrl }} /user:admin 你的密码</code>
+              <code class="code-block">net use Z: {{ webdavUrl }} /user:{{ webdavForm.webdav_username || 'admin' }} 你的密码</code>
             </el-collapse-item>
             <el-collapse-item title="macOS" name="mac">
-              <p>Finder → <code>Command + K</code> → 输入挂载地址 → 使用账号 <code>admin</code> 和管理员密码登录。</p>
+              <p>Finder → <code>Command + K</code> → 输入挂载地址 → 使用账号 <code>{{ webdavForm.webdav_username || 'admin' }}</code> 和 WebDAV 密码登录。</p>
             </el-collapse-item>
             <el-collapse-item title="Linux" name="linux">
               <p>安装 davfs2 后挂载：</p>
@@ -447,6 +481,7 @@ const cloudForm = ref({
 const siteForm = ref({
   site_title: '',
   site_logo: '',
+  login_username: '',
   login_title: '',
   login_avatar: '',
   login_role_tag: '',
@@ -468,6 +503,15 @@ const directForm = ref({
   direct_rate_limit: 60,
   direct_reject_placeholder: true
 })
+
+// WebDAV 设置
+const webdavForm = ref({
+  webdav_enabled: true,
+  webdav_username: 'admin',
+  webdav_password: '',
+  webdav_readonly: false
+})
+const webdavPasswordSet = ref(false)
 
 // 监控相关
 const monitorForm = ref({
@@ -492,6 +536,22 @@ const monitorStatus = ref({
   running: false,
   status: null as any
 })
+
+// 检查间隔的值+单位（后端统一存秒）
+const intervalValue = ref(5)
+const intervalUnit = ref(60)
+
+function secondsToInterval(seconds: number) {
+  for (const unit of [86400, 3600, 60]) {
+    if (seconds >= unit && seconds % unit === 0) {
+      intervalValue.value = seconds / unit
+      intervalUnit.value = unit
+      return
+    }
+  }
+  intervalValue.value = Math.max(1, Math.round(seconds / 60))
+  intervalUnit.value = 60
+}
 
 const notifications = ref<any[]>([])
 const notificationPage = ref(1)
@@ -534,6 +594,7 @@ async function loadSettings() {
     siteForm.value = {
       site_title: res.data.site_title,
       site_logo: res.data.site_logo,
+      login_username: res.data.login_username || '',
       login_title: res.data.login_title || '',
       login_avatar: res.data.login_avatar || '',
       login_role_tag: res.data.login_role_tag || '',
@@ -547,6 +608,13 @@ async function loadSettings() {
       direct_rate_limit: res.data.direct_rate_limit ?? 60,
       direct_reject_placeholder: res.data.direct_reject_placeholder ?? true
     }
+    webdavForm.value = {
+      webdav_enabled: res.data.webdav_enabled ?? true,
+      webdav_username: res.data.webdav_username || 'admin',
+      webdav_password: '',
+      webdav_readonly: res.data.webdav_readonly ?? false
+    }
+    webdavPasswordSet.value = !!res.data.webdav_password_set
   } catch (error) {
     // 错误已处理
   }
@@ -611,6 +679,29 @@ async function saveDirectSettings() {
   }
 }
 
+async function saveWebdavSettings() {
+  saving.value = true
+  try {
+    const payload: any = {
+      webdav_enabled: webdavForm.value.webdav_enabled,
+      webdav_username: webdavForm.value.webdav_username || 'admin',
+      webdav_readonly: webdavForm.value.webdav_readonly
+    }
+    // 仅在填写了新密码时提交，留空表示不修改
+    if (webdavForm.value.webdav_password) {
+      payload.webdav_password = webdavForm.value.webdav_password
+    }
+    await settingsApi.update(payload)
+    ElMessage.success('WebDAV 设置已保存')
+    webdavForm.value.webdav_password = ''
+    loadSettings()
+  } catch (error) {
+    // 错误已处理
+  } finally {
+    saving.value = false
+  }
+}
+
 async function updatePassword() {
   if (passwordForm.value.new_password !== passwordForm.value.confirm_password) {
     ElMessage.error('两次输入的密码不一致')
@@ -656,6 +747,7 @@ async function loadMonitorSettings() {
       webhook_url: res.data.webhook_url || '',
       pushdeer_key: res.data.pushdeer_key || ''
     }
+    secondsToInterval(monitorForm.value.monitor_interval)
   } catch (error) {
     // 错误已处理
   }
@@ -693,7 +785,7 @@ async function saveMonitorSettings() {
     const filterMasked = (v: string) => v.includes('****') ? '' : v
     await monitorApi.updateSettings({
       monitor_enabled: monitorForm.value.monitor_enabled,
-      monitor_interval: monitorForm.value.monitor_interval,
+      monitor_interval: intervalValue.value * intervalUnit.value,
       notify_enabled: monitorForm.value.notify_enabled,
       default_notify_channel: monitorForm.value.default_notify_channel,
       bark_url: filterMasked(monitorForm.value.bark_url),

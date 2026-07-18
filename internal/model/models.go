@@ -21,6 +21,7 @@ type Settings struct {
 	SiteTitle    string `json:"site_title"`
 	SiteLogo     string `json:"site_logo"`
 	// 登录页自定义
+	LoginUsername   string `json:"login_username"`    // 登录页显示的用户名（可自定义）
 	LoginTitle      string `json:"login_title"`       // 登录窗口标题栏文字
 	LoginAvatar     string `json:"login_avatar"`      // 登录页头像（emoji或图片URL）
 	LoginRoleTag    string `json:"login_role_tag"`    // 角色标签
@@ -28,6 +29,11 @@ type Settings struct {
 	LoginSystemName string `json:"login_system_name"` // 系统名称
 	// 分享页自定义
 	ShareFooter string `json:"share_footer"` // 分享页底部署名
+	// WebDAV 配置
+	WebdavEnabled  bool   `json:"webdav_enabled"`  // 是否开启 WebDAV
+	WebdavUsername string `json:"webdav_username"` // WebDAV 账号
+	WebdavPassword string `json:"webdav_password"` // WebDAV 密码，空=沿用管理员密码
+	WebdavReadonly bool   `json:"webdav_readonly"` // 只读模式（禁止写入/删除）
 	// 监控配置
 	MonitorEnabled  bool `json:"monitor_enabled"`  // 是否启用监控
 	MonitorInterval int  `json:"monitor_interval"` // 监控间隔（秒）

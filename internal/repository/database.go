@@ -142,6 +142,15 @@ func (d *Database) migrate() error {
 		`ALTER TABLE settings ADD COLUMN direct_allow_empty_referer BOOLEAN DEFAULT 1`,
 		`ALTER TABLE settings ADD COLUMN direct_rate_limit INTEGER DEFAULT 60`,
 		`ALTER TABLE settings ADD COLUMN direct_reject_placeholder BOOLEAN DEFAULT 1`,
+
+		// WebDAV 配置字段
+		`ALTER TABLE settings ADD COLUMN webdav_enabled BOOLEAN DEFAULT 1`,
+		`ALTER TABLE settings ADD COLUMN webdav_username TEXT DEFAULT 'admin'`,
+		`ALTER TABLE settings ADD COLUMN webdav_password TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN webdav_readonly BOOLEAN DEFAULT 0`,
+
+		// 登录页用户名（可自定义，避免写死）
+		`ALTER TABLE settings ADD COLUMN login_username TEXT DEFAULT 'Administrator'`,
 	}
 
 	for _, migration := range migrations {
