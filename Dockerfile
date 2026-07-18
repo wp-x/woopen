@@ -12,7 +12,9 @@ RUN CGO_ENABLED=1 go build -o woopen ./cmd/server
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY web/package*.json ./
-RUN npm install
+# 删除锁文件按容器平台重装，规避 npm optionalDependencies bug(npm/cli#4828)
+# 否则 Alpine 下缺 @rollup/rollup-linux-*-musl 导致 vite build 失败
+RUN rm -f package-lock.json && npm install
 COPY web/ ./
 RUN npm run build
 
