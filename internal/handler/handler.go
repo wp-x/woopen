@@ -720,10 +720,18 @@ func (h *Handler) VerifySharePassword(c *gin.Context) {
 	})
 }
 
+// shareFileID 取分享内文件ID：优先 query（fid 可能含 '/'，路径段放不下），兼容旧路径参数。
+func shareFileID(c *gin.Context) string {
+	if fid := c.Query("fid"); fid != "" {
+		return fid
+	}
+	return c.Param("fileId")
+}
+
 // DownloadShare 下载分享文件（302重定向）
 func (h *Handler) DownloadShare(c *gin.Context) {
 	code := c.Param("code")
-	fileID := c.Param("fileId")
+	fileID := shareFileID(c)
 
 	share, err := h.shareRepo.GetByCode(code)
 	if err != nil || !share.IsActive {
@@ -1413,7 +1421,7 @@ func (h *Handler) GetShareQRCode(c *gin.Context) {
 // PreviewShare 预览分享文件（302重定向）
 func (h *Handler) PreviewShare(c *gin.Context) {
 	code := c.Param("code")
-	fileID := c.Param("fileId")
+	fileID := shareFileID(c)
 
 	share, err := h.shareRepo.GetByCode(code)
 	if err != nil || !share.IsActive {

@@ -123,9 +123,10 @@ func (c *Client) uploadFileLocked(client *wopan.WoClient, params uploadParams) (
 	}
 
 	// 转换为内部文件信息格式
+	// Upload2C 返回的就是文件的 fid（下载/直连用它），不是普通 id
 	fileInfo := &model.FileInfo{
 		ID:       fileID,
-		FID:      params.parentID,
+		FID:      fileID,
 		Name:     params.fileName,
 		Size:     size,
 		IsDir:    false,

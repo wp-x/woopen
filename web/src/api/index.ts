@@ -175,17 +175,20 @@ export const publicApi = {
         if (fileId) params.file_id = fileId
         return axios.get(`/s/${code}/info`, { params }).then(res => res.data)
     },
+    // fid 是 base64 形态、可能含 '/'，放路径段会破坏路由，必须走 query
     getDownloadUrl: (code: string, fileId?: string, pwd?: string) => {
-        let url = `/s/${code}/download`
-        if (fileId) url += `/${fileId}`
-        if (pwd) url += `?pwd=${encodeURIComponent(pwd)}`
-        return url
+        const params = new URLSearchParams()
+        if (fileId) params.set('fid', fileId)
+        if (pwd) params.set('pwd', pwd)
+        const qs = params.toString()
+        return `/s/${code}/download${qs ? '?' + qs : ''}`
     },
     getPreviewUrl: (code: string, fileId?: string, pwd?: string) => {
-        let url = `/s/${code}/preview`
-        if (fileId) url += `/${fileId}`
-        if (pwd) url += `?pwd=${encodeURIComponent(pwd)}`
-        return url
+        const params = new URLSearchParams()
+        if (fileId) params.set('fid', fileId)
+        if (pwd) params.set('pwd', pwd)
+        const qs = params.toString()
+        return `/s/${code}/preview${qs ? '?' + qs : ''}`
     }
 }
 
