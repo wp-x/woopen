@@ -72,6 +72,11 @@
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <div class="row-actions">
+               <el-tooltip v-if="row.is_direct" content="嵌入代码" placement="top" :hide-after="0">
+                <el-button class="btn-brutal-icon" @click="showEmbed(row)">
+                  <el-icon><Connection /></el-icon>
+                </el-button>
+              </el-tooltip>
                <el-button class="btn-brutal-icon" @click="showQRCode(row)">
                 <el-icon><Grid /></el-icon>
               </el-button>
@@ -159,6 +164,19 @@
           保存
         </el-button>
       </template>
+    </el-dialog>
+
+    <!-- 嵌入代码对话框 -->
+    <el-dialog v-model="embedDialogVisible" title="嵌入代码" width="520px">
+      <div class="embed-list">
+        <div v-for="item in embedSnippets" :key="item.label" class="embed-item">
+          <div class="embed-label">{{ item.label }}</div>
+          <div class="embed-row">
+            <el-input v-model="item.code" readonly />
+            <el-button class="btn-brutal-small" @click="copyText(item.code)">复制</el-button>
+          </div>
+        </div>
+      </div>
     </el-dialog>
 
     <!-- 二维码对话框 -->
@@ -255,6 +273,28 @@ function copyLink(code: string, isDirect = false) {
   ElMessage.success('链接已复制')
 }
 
+function copyText(text: string) {
+  navigator.clipboard.writeText(text)
+  ElMessage.success('已复制')
+}
+
+// 嵌入代码（仅直连分享）
+const embedDialogVisible = ref(false)
+const embedSnippets = ref<{ label: string; code: string }[]>([])
+
+function showEmbed(share: Share) {
+  const url = getShareUrl(share.share_code, true)
+  const name = share.target_name || 'file'
+  embedSnippets.value = [
+    { label: '直链 URL', code: url },
+    { label: 'HTML 图片', code: `<img src="${url}" alt="${name}">` },
+    { label: 'Markdown', code: `![${name}](${url})` },
+    { label: 'HTML 视频', code: `<video src="${url}" controls></video>` },
+    { label: 'BBCode', code: `[img]${url}[/img]` }
+  ]
+  embedDialogVisible.value = true
+}
+
 function openEditDialog(share: Share) {
   editForm.value = {
     id: share.id,
@@ -344,6 +384,23 @@ onMounted(() => {
 <style scoped>
 .shares-page {
   max-width: 1400px;
+}
+
+.embed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.embed-label {
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.embed-row {
+  display: flex;
+  gap: 8px;
 }
 
 .card-header {

@@ -147,6 +147,9 @@
             <el-button type="primary" @click="checkNow" :loading="checking">
               立即检查
             </el-button>
+            <el-button type="success" @click="saveMonitorSettings" :loading="savingMonitor">
+              保存设置
+            </el-button>
           </el-form-item>
         </el-form>
 

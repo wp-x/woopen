@@ -308,7 +308,23 @@ body {
 }
 
 .el-tag--success {
-  background-color: var(--acid-green) !important;
+  background-color: var(--pure-black) !important;
+  color: var(--pure-white) !important;
+}
+
+/* Success 提示消息 - 黑白高对比（原绿白看不清字） */
+.el-message--success {
+  --el-message-bg-color: var(--pure-white);
+  --el-message-border-color: var(--pure-black);
+  --el-message-text-color: var(--pure-black);
+  border: 2px solid var(--pure-black) !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.15);
+}
+
+.el-message--success .el-message__icon,
+.el-message--success .el-message__content {
+  color: var(--pure-black) !important;
 }
 
 .el-tag--danger {
