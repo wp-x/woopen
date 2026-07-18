@@ -107,6 +107,10 @@ func (d *Database) migrate() error {
 		`ALTER TABLE settings ADD COLUMN pushplus_token TEXT DEFAULT ''`,
 		`ALTER TABLE settings ADD COLUMN dingtalk_webhook TEXT DEFAULT ''`,
 		`ALTER TABLE settings ADD COLUMN wecom_webhook TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN wecom_app_config TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN feishu_webhook TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN webhook_url TEXT DEFAULT ''`,
+		`ALTER TABLE settings ADD COLUMN pushdeer_key TEXT DEFAULT ''`,
 
 		// 通知记录表
 		`CREATE TABLE IF NOT EXISTS notification_logs (

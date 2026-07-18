@@ -156,6 +156,10 @@ func (m *MonitorService) check() {
 		PushplusToken:    settings.PushplusToken,
 		DingtalkWebhook:  settings.DingtalkWebhook,
 		WecomWebhook:     settings.WecomWebhook,
+		WecomAppConfig:   settings.WecomAppConfig,
+		FeishuWebhook:    settings.FeishuWebhook,
+		WebhookURL:       settings.WebhookURL,
+		PushdeerKey:      settings.PushdeerKey,
 	}
 
 	if checkErr != nil {
@@ -272,6 +276,10 @@ func (m *MonitorService) TestNotify() (map[string]string, error) {
 		PushplusToken:    settings.PushplusToken,
 		DingtalkWebhook:  settings.DingtalkWebhook,
 		WecomWebhook:     settings.WecomWebhook,
+		WecomAppConfig:   settings.WecomAppConfig,
+		FeishuWebhook:    settings.FeishuWebhook,
+		WebhookURL:       settings.WebhookURL,
+		PushdeerKey:      settings.PushdeerKey,
 	}
 
 	results := m.notifier.TestAll(config)

@@ -17,14 +17,21 @@ type JWTClaims struct {
 // JWTSecret JWT密钥（运行时设置）
 var JWTSecret string
 
-// GenerateToken 生成JWT Token
-func GenerateToken() (string, error) {
+// GenerateToken 生成JWT Token，expire: 7d | 30d | forever（默认30d）
+func GenerateToken(expire string) (string, error) {
 	claims := JWTClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "woopen",
+			IssuedAt: jwt.NewNumericDate(time.Now()),
+			Issuer:   "woopen",
 		},
+	}
+	// ponytail: forever 即不设过期；JWT不可吊销，泄露只能靠换JWTSecret补救
+	switch expire {
+	case "7d":
+		claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour))
+	case "forever":
+	default:
+		claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour))
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(JWTSecret))

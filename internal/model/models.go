@@ -35,12 +35,16 @@ type Settings struct {
 	NotifyEnabled        bool   `json:"notify_enabled"`         // 是否启用通知
 	DefaultNotifyChannel string `json:"default_notify_channel"` // 默认通知渠道
 	BarkURL              string `json:"bark_url"`               // Bark 推送地址
-	ServerchanKey    string `json:"serverchan_key"`     // Server 酱 SendKey
-	TelegramBotToken string `json:"telegram_bot_token"` // Telegram Bot Token
-	TelegramChatID   string `json:"telegram_chat_id"`   // Telegram Chat ID
-	PushplusToken    string `json:"pushplus_token"`     // PushPlus Token
-	DingtalkWebhook  string `json:"dingtalk_webhook"`   // 钉钉 Webhook
-	WecomWebhook     string `json:"wecom_webhook"`      // 企业微信 Webhook
+	ServerchanKey        string `json:"serverchan_key"`         // Server 酱 SendKey
+	TelegramBotToken     string `json:"telegram_bot_token"`     // Telegram Bot Token
+	TelegramChatID       string `json:"telegram_chat_id"`       // Telegram Chat ID
+	PushplusToken        string `json:"pushplus_token"`         // PushPlus Token
+	DingtalkWebhook      string `json:"dingtalk_webhook"`       // 钉钉 Webhook
+	WecomWebhook         string `json:"wecom_webhook"`          // 企业微信群机器人 Webhook
+	WecomAppConfig       string `json:"wecom_app_config"`       // 企业微信应用消息 corpid,secret,touser,agentid
+	FeishuWebhook        string `json:"feishu_webhook"`         // 飞书机器人 Webhook
+	WebhookURL           string `json:"webhook_url"`            // 通用 Webhook（POST JSON）
+	PushdeerKey          string `json:"pushdeer_key"`           // PushDeer PushKey
 	// 直连（图床/外链）配置
 	DirectRefererWhitelist  string `json:"direct_referer_whitelist"`   // 逗号分隔域名，空=不限制
 	DirectAllowEmptyReferer bool   `json:"direct_allow_empty_referer"` // 允许空 Referer（默认开）
@@ -127,6 +131,7 @@ type CreateShareRequest struct {
 // LoginRequest 登录请求
 type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
+	Expire   string `json:"expire"` // 7d | 30d | forever，默认30d
 }
 
 // LoginResponse 登录响应

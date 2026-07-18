@@ -181,7 +181,11 @@
               <el-option label="Telegram" value="telegram" />
               <el-option label="PushPlus (微信)" value="pushplus" />
               <el-option label="钉钉机器人" value="dingtalk" />
-              <el-option label="企业微信" value="wecom" />
+              <el-option label="企业微信群机器人" value="wecom" />
+              <el-option label="企业微信应用消息" value="wecom_app" />
+              <el-option label="飞书机器人" value="feishu" />
+              <el-option label="通用 Webhook" value="webhook" />
+              <el-option label="PushDeer" value="pushdeer" />
             </el-select>
             <div class="form-tip">优先使用此渠道发送通知</div>
           </el-form-item>
@@ -226,14 +230,50 @@
             <el-divider content-position="left">钉钉机器人</el-divider>
             <el-form-item label="Webhook">
               <el-input v-model="monitorForm.dingtalk_webhook" placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
+              <div class="form-tip">机器人开启"加签"时，在地址后追加英文逗号和密钥：webhook地址,SEC开头的密钥</div>
             </el-form-item>
           </template>
 
-          <!-- 企业微信 -->
+          <!-- 企业微信群机器人 -->
           <template v-if="monitorForm.default_notify_channel === 'wecom'">
-            <el-divider content-position="left">企业微信</el-divider>
+            <el-divider content-position="left">企业微信群机器人</el-divider>
             <el-form-item label="Webhook">
               <el-input v-model="monitorForm.wecom_webhook" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." />
+            </el-form-item>
+          </template>
+
+          <!-- 企业微信应用消息 -->
+          <template v-if="monitorForm.default_notify_channel === 'wecom_app'">
+            <el-divider content-position="left">企业微信应用消息</el-divider>
+            <el-form-item label="应用配置">
+              <el-input v-model="monitorForm.wecom_app_config" placeholder="corpid,corpsecret,touser,agentid" show-password type="password" />
+              <div class="form-tip">格式：corpid,corpsecret,touser,agentid（touser 填 @all 发给全员），消息推送到微信的"企业微信插件"</div>
+            </el-form-item>
+          </template>
+
+          <!-- 飞书机器人 -->
+          <template v-if="monitorForm.default_notify_channel === 'feishu'">
+            <el-divider content-position="left">飞书机器人</el-divider>
+            <el-form-item label="Webhook">
+              <el-input v-model="monitorForm.feishu_webhook" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..." />
+            </el-form-item>
+          </template>
+
+          <!-- 通用 Webhook -->
+          <template v-if="monitorForm.default_notify_channel === 'webhook'">
+            <el-divider content-position="left">通用 Webhook</el-divider>
+            <el-form-item label="URL">
+              <el-input v-model="monitorForm.webhook_url" placeholder="https://example.com/hook" />
+              <div class="form-tip">以 POST JSON 发送：{"title": "...", "message": "..."}</div>
+            </el-form-item>
+          </template>
+
+          <!-- PushDeer -->
+          <template v-if="monitorForm.default_notify_channel === 'pushdeer'">
+            <el-divider content-position="left">PushDeer</el-divider>
+            <el-form-item label="PushKey">
+              <el-input v-model="monitorForm.pushdeer_key" placeholder="PDU..." show-password type="password" />
+              <div class="form-tip">自建服务填：https://自建地址/message/push,PushKey</div>
             </el-form-item>
           </template>
 
@@ -441,7 +481,11 @@ const monitorForm = ref({
   telegram_chat_id: '',
   pushplus_token: '',
   dingtalk_webhook: '',
-  wecom_webhook: ''
+  wecom_webhook: '',
+  wecom_app_config: '',
+  feishu_webhook: '',
+  webhook_url: '',
+  pushdeer_key: ''
 })
 
 const monitorStatus = ref({
@@ -606,7 +650,11 @@ async function loadMonitorSettings() {
       telegram_chat_id: res.data.telegram_chat_id || '',
       pushplus_token: res.data.pushplus_token || '',
       dingtalk_webhook: res.data.dingtalk_webhook || '',
-      wecom_webhook: res.data.wecom_webhook || ''
+      wecom_webhook: res.data.wecom_webhook || '',
+      wecom_app_config: res.data.wecom_app_config || '',
+      feishu_webhook: res.data.feishu_webhook || '',
+      webhook_url: res.data.webhook_url || '',
+      pushdeer_key: res.data.pushdeer_key || ''
     }
   } catch (error) {
     // 错误已处理
@@ -647,13 +695,18 @@ async function saveMonitorSettings() {
       monitor_enabled: monitorForm.value.monitor_enabled,
       monitor_interval: monitorForm.value.monitor_interval,
       notify_enabled: monitorForm.value.notify_enabled,
+      default_notify_channel: monitorForm.value.default_notify_channel,
       bark_url: filterMasked(monitorForm.value.bark_url),
       serverchan_key: filterMasked(monitorForm.value.serverchan_key),
       telegram_bot_token: filterMasked(monitorForm.value.telegram_bot_token),
       telegram_chat_id: monitorForm.value.telegram_chat_id,
       pushplus_token: filterMasked(monitorForm.value.pushplus_token),
       dingtalk_webhook: filterMasked(monitorForm.value.dingtalk_webhook),
-      wecom_webhook: filterMasked(monitorForm.value.wecom_webhook)
+      wecom_webhook: filterMasked(monitorForm.value.wecom_webhook),
+      wecom_app_config: filterMasked(monitorForm.value.wecom_app_config),
+      feishu_webhook: filterMasked(monitorForm.value.feishu_webhook),
+      webhook_url: filterMasked(monitorForm.value.webhook_url),
+      pushdeer_key: filterMasked(monitorForm.value.pushdeer_key)
     })
     ElMessage.success('监控设置已保存')
     loadMonitorStatus()
@@ -725,6 +778,10 @@ function getChannelTagType(channel: string) {
     'pushplus': 'warning',
     'dingtalk': 'primary',
     'wecom': 'success',
+    'wecom_app': 'success',
+    'feishu': 'info',
+    'webhook': 'warning',
+    'pushdeer': 'primary',
     'token_invalid': 'danger',
     'token_refreshed': 'success'
   }
@@ -738,7 +795,11 @@ function getChannelLabel(channel: string) {
     'telegram': 'Telegram',
     'pushplus': 'PushPlus',
     'dingtalk': '钉钉',
-    'wecom': '企业微信',
+    'wecom': '企业微信机器人',
+    'wecom_app': '企业微信应用',
+    'feishu': '飞书',
+    'webhook': 'Webhook',
+    'pushdeer': 'PushDeer',
     'token_invalid': 'Token失效',
     'token_refreshed': 'Token刷新'
   }

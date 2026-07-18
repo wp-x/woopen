@@ -49,7 +49,7 @@ api.interceptors.response.use(
 
 // 认证API
 export const authApi = {
-    login: (password: string) => api.post('/auth/login', { password }),
+    login: (password: string, expire = '30d') => api.post('/auth/login', { password, expire }),
     logout: () => api.post('/auth/logout'),
     getMe: () => api.get('/auth/me')
 }
@@ -147,6 +147,10 @@ export const monitorApi = {
         pushplus_token?: string
         dingtalk_webhook?: string
         wecom_webhook?: string
+        wecom_app_config?: string
+        feishu_webhook?: string
+        webhook_url?: string
+        pushdeer_key?: string
     }) => api.put('/monitor/settings', data),
     // 测试通知（所有已配置渠道）
     testNotify: () => api.post('/monitor/notify/test'),

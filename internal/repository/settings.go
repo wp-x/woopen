@@ -23,6 +23,7 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 	var monitorEnabled, notifyEnabled sql.NullBool
 	var monitorInterval sql.NullInt64
 	var barkURL, serverchanKey, telegramBotToken, telegramChatID, pushplusToken, dingtalkWebhook, wecomWebhook sql.NullString
+	var wecomAppConfig, feishuWebhook, webhookURL, pushdeerKey sql.NullString
 	var defaultNotifyChannel sql.NullString
 	var directRefererWhitelist sql.NullString
 	var directAllowEmptyReferer, directRejectPlaceholder sql.NullBool
@@ -46,6 +47,10 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 			   COALESCE(pushplus_token, '') as pushplus_token,
 			   COALESCE(dingtalk_webhook, '') as dingtalk_webhook,
 			   COALESCE(wecom_webhook, '') as wecom_webhook,
+			   COALESCE(wecom_app_config, '') as wecom_app_config,
+			   COALESCE(feishu_webhook, '') as feishu_webhook,
+			   COALESCE(webhook_url, '') as webhook_url,
+			   COALESCE(pushdeer_key, '') as pushdeer_key,
 			   COALESCE(direct_referer_whitelist, '') as direct_referer_whitelist,
 			   COALESCE(direct_allow_empty_referer, 1) as direct_allow_empty_referer,
 			   COALESCE(direct_rate_limit, 60) as direct_rate_limit,
@@ -75,6 +80,10 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 		&pushplusToken,
 		&dingtalkWebhook,
 		&wecomWebhook,
+		&wecomAppConfig,
+		&feishuWebhook,
+		&webhookURL,
+		&pushdeerKey,
 		&directRefererWhitelist,
 		&directAllowEmptyReferer,
 		&directRateLimit,
@@ -141,6 +150,18 @@ func (r *SettingsRepository) Get() (*model.Settings, error) {
 	if wecomWebhook.Valid {
 		settings.WecomWebhook = wecomWebhook.String
 	}
+	if wecomAppConfig.Valid {
+		settings.WecomAppConfig = wecomAppConfig.String
+	}
+	if feishuWebhook.Valid {
+		settings.FeishuWebhook = feishuWebhook.String
+	}
+	if webhookURL.Valid {
+		settings.WebhookURL = webhookURL.String
+	}
+	if pushdeerKey.Valid {
+		settings.PushdeerKey = pushdeerKey.String
+	}
 	if directRefererWhitelist.Valid {
 		settings.DirectRefererWhitelist = directRefererWhitelist.String
 	}
@@ -188,6 +209,10 @@ func (r *SettingsRepository) Update(settings *model.Settings) error {
 			pushplus_token = ?,
 			dingtalk_webhook = ?,
 			wecom_webhook = ?,
+			wecom_app_config = ?,
+			feishu_webhook = ?,
+			webhook_url = ?,
+			pushdeer_key = ?,
 			direct_referer_whitelist = ?,
 			direct_allow_empty_referer = ?,
 			direct_rate_limit = ?,
@@ -217,6 +242,10 @@ func (r *SettingsRepository) Update(settings *model.Settings) error {
 		settings.PushplusToken,
 		settings.DingtalkWebhook,
 		settings.WecomWebhook,
+		settings.WecomAppConfig,
+		settings.FeishuWebhook,
+		settings.WebhookURL,
+		settings.PushdeerKey,
 		settings.DirectRefererWhitelist,
 		settings.DirectAllowEmptyReferer,
 		settings.DirectRateLimit,

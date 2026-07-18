@@ -36,6 +36,14 @@
           <label class="brutal-label">> 用户名</label>
           <input type="text" value="Administrator" readonly class="brutal-input readonly">
           
+          <label class="brutal-label">> 授权时长</label>
+          <div class="expire-options">
+            <label v-for="opt in expireOptions" :key="opt.value" class="expire-option"
+                   :class="{ active: expire === opt.value }" @click="expire = opt.value; playSound('click')">
+              {{ opt.label }}
+            </label>
+          </div>
+
           <label class="brutal-label">> 访问密码</label>
           <input 
             type="password" 
@@ -72,6 +80,12 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const password = ref('')
+const expire = ref('30d')
+const expireOptions = [
+  { value: '7d', label: '7天' },
+  { value: '30d', label: '30天' },
+  { value: 'forever', label: '永久' }
+]
 const loading = ref(false)
 const passwordInput = ref<HTMLInputElement | null>(null)
 const loginBtn = ref<HTMLButtonElement | null>(null)
@@ -184,7 +198,7 @@ async function handleLogin() {
       }, 100)
 
       try {
-        const res = await authApi.login(password.value)
+        const res = await authApi.login(password.value, expire.value)
         authStore.setToken(res.data.token)
         
         clearInterval(flickerInterval)
@@ -329,6 +343,28 @@ onMounted(() => {
     font-size: 30px; 
     margin: 0 0 20px 0; 
     text-transform: uppercase;
+}
+
+.expire-options {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.expire-option {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    border: var(--border-thick);
+    background: var(--pure-white);
+    cursor: pointer;
+    font-weight: 700;
+    user-select: none;
+}
+
+.expire-option.active {
+    background: var(--acid-green);
+    box-shadow: 4px 4px 0 var(--pure-black);
 }
 
 .readonly {

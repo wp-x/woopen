@@ -166,7 +166,7 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 
 	// 生成Token
-	token, err := middleware.GenerateToken()
+	token, err := middleware.GenerateToken(req.Expire)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.APIResponse{
 			Code:    500,
@@ -1673,6 +1673,7 @@ func (h *Handler) UpdateMonitorSettings(c *gin.Context) {
 		MonitorEnabled   *bool  `json:"monitor_enabled"`
 		MonitorInterval  *int   `json:"monitor_interval"`
 		NotifyEnabled    *bool  `json:"notify_enabled"`
+		DefaultChannel   string `json:"default_notify_channel"`
 		BarkURL          string `json:"bark_url"`
 		ServerchanKey    string `json:"serverchan_key"`
 		TelegramBotToken string `json:"telegram_bot_token"`
@@ -1680,6 +1681,10 @@ func (h *Handler) UpdateMonitorSettings(c *gin.Context) {
 		PushplusToken    string `json:"pushplus_token"`
 		DingtalkWebhook  string `json:"dingtalk_webhook"`
 		WecomWebhook     string `json:"wecom_webhook"`
+		WecomAppConfig   string `json:"wecom_app_config"`
+		FeishuWebhook    string `json:"feishu_webhook"`
+		WebhookURL       string `json:"webhook_url"`
+		PushdeerKey      string `json:"pushdeer_key"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.APIResponse{
@@ -1710,6 +1715,9 @@ func (h *Handler) UpdateMonitorSettings(c *gin.Context) {
 	if req.NotifyEnabled != nil {
 		settings.NotifyEnabled = *req.NotifyEnabled
 	}
+	if req.DefaultChannel != "" {
+		settings.DefaultNotifyChannel = req.DefaultChannel
+	}
 	// 通知渠道配置（只有传入非空值时才更新，空字符串表示保持原值）
 	if req.BarkURL != "" {
 		settings.BarkURL = req.BarkURL
@@ -1731,6 +1739,18 @@ func (h *Handler) UpdateMonitorSettings(c *gin.Context) {
 	}
 	if req.WecomWebhook != "" {
 		settings.WecomWebhook = req.WecomWebhook
+	}
+	if req.WecomAppConfig != "" {
+		settings.WecomAppConfig = req.WecomAppConfig
+	}
+	if req.FeishuWebhook != "" {
+		settings.FeishuWebhook = req.FeishuWebhook
+	}
+	if req.WebhookURL != "" {
+		settings.WebhookURL = req.WebhookURL
+	}
+	if req.PushdeerKey != "" {
+		settings.PushdeerKey = req.PushdeerKey
 	}
 
 	if err := h.settingsRepo.Update(settings); err != nil {
@@ -1803,16 +1823,21 @@ func (h *Handler) GetMonitorSettings(c *gin.Context) {
 		Code:    0,
 		Message: "success",
 		Data: gin.H{
-			"monitor_enabled":    settings.MonitorEnabled,
-			"monitor_interval":   settings.MonitorInterval,
-			"notify_enabled":     settings.NotifyEnabled,
-			"bark_url":           maskString(settings.BarkURL),
-			"serverchan_key":     maskString(settings.ServerchanKey),
-			"telegram_bot_token": maskString(settings.TelegramBotToken),
-			"telegram_chat_id":   settings.TelegramChatID, // Chat ID 不脱敏
-			"pushplus_token":     maskString(settings.PushplusToken),
-			"dingtalk_webhook":   maskString(settings.DingtalkWebhook),
-			"wecom_webhook":      maskString(settings.WecomWebhook),
+			"monitor_enabled":        settings.MonitorEnabled,
+			"monitor_interval":       settings.MonitorInterval,
+			"notify_enabled":         settings.NotifyEnabled,
+			"default_notify_channel": settings.DefaultNotifyChannel,
+			"bark_url":               maskString(settings.BarkURL),
+			"serverchan_key":         maskString(settings.ServerchanKey),
+			"telegram_bot_token":     maskString(settings.TelegramBotToken),
+			"telegram_chat_id":       settings.TelegramChatID, // Chat ID 不脱敏
+			"pushplus_token":         maskString(settings.PushplusToken),
+			"dingtalk_webhook":       maskString(settings.DingtalkWebhook),
+			"wecom_webhook":          maskString(settings.WecomWebhook),
+			"wecom_app_config":       maskString(settings.WecomAppConfig),
+			"feishu_webhook":         maskString(settings.FeishuWebhook),
+			"webhook_url":            maskString(settings.WebhookURL),
+			"pushdeer_key":           maskString(settings.PushdeerKey),
 		},
 	})
 }
