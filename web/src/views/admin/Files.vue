@@ -1210,7 +1210,7 @@ function copyDirectMarkdown() {
 }
 
 function copyDirectHtml() {
-  copyText(`<img src="${shareResult.value.url}" alt="${shareResult.value.name}">`, 'HTML')
+  copyText(`<img src="${shareResult.value.url}" alt="${shareResult.value.name}" referrerpolicy="no-referrer">`, 'HTML')
 }
 
 function copyAllLinks() {

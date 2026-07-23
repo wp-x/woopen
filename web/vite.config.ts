@@ -16,6 +16,10 @@ export default defineConfig({
         target: 'http://localhost:10010',
         changeOrigin: true
       },
+      '/f/': {
+        target: 'http://localhost:10010',
+        changeOrigin: true
+      },
       '/s/': {
         target: 'http://localhost:10010',
         changeOrigin: true,

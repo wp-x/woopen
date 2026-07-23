@@ -287,7 +287,9 @@ function showEmbed(share: Share) {
   const name = share.target_name || 'file'
   embedSnippets.value = [
     { label: '直链 URL', code: url },
-    { label: 'HTML 图片', code: `<img src="${url}" alt="${name}">` },
+    // referrerpolicy=no-referrer：联通 CDN 只放行空 Referer，跟随 302 时不带来源才能出图。
+    // video/audio 不支持该属性（whatwg/html#7822），视频外链需嵌入页自设 no-referrer 策略。
+    { label: 'HTML 图片', code: `<img src="${url}" alt="${name}" referrerpolicy="no-referrer">` },
     { label: 'Markdown', code: `![${name}](${url})` },
     { label: 'HTML 视频', code: `<video src="${url}" controls></video>` },
     { label: 'BBCode', code: `[img]${url}[/img]` }
