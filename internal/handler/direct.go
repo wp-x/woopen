@@ -66,8 +66,17 @@ func (h *Handler) DirectLink(c *gin.Context) {
 	code := c.Param("code")
 
 	share, err := h.shareRepo.GetByCode(code)
-	// 非直连分享不能走 /f/（避免绕过密码），一律按不存在处理
-	if err != nil || !share.IsActive || !share.IsDirect {
+	if err != nil || !share.IsActive {
+		h.directRejectWith(c, http.StatusNotFound, "链接不存在", true)
+		return
+	}
+	// 兼容旧数据：文件夹没有单文件直链，改用目录树分享页。
+	if share.TargetType == "folder" && share.IsDirect {
+		c.Redirect(http.StatusFound, "/s/"+url.PathEscape(code))
+		return
+	}
+	// 非直连分享不能走 /f/，避免绕过密码。
+	if !share.IsDirect {
 		h.directRejectWith(c, http.StatusNotFound, "链接不存在", true)
 		return
 	}

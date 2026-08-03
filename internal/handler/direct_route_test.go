@@ -29,6 +29,7 @@ func TestDirectLinkRouteHotlink(t *testing.T) {
 	shareRepo := repository.NewShareRepository(db.DB())
 	shareRepo.Create(&model.Share{ShareCode: "img", TargetType: "file", TargetID: "fid", TargetPath: "/a.png", TargetName: "a.png", IsActive: true, IsDirect: true})
 	shareRepo.Create(&model.Share{ShareCode: "sec", TargetType: "file", TargetID: "fid2", TargetPath: "/b", TargetName: "b", IsActive: true, IsDirect: false})
+	shareRepo.Create(&model.Share{ShareCode: "dir", TargetType: "folder", TargetID: "dir-id", TargetPath: "/docs", TargetName: "docs", IsActive: true, IsDirect: true})
 
 	h := NewHandler(HandlerOptions{
 		SettingsRepo:  settingsRepo,
@@ -56,6 +57,10 @@ func TestDirectLinkRouteHotlink(t *testing.T) {
 	// 非直连分享走 /f/ → 404 占位图
 	if w := do("sec", "", ""); w.Code != http.StatusNotFound {
 		t.Fatalf("非直连应 404，得 %d", w.Code)
+	}
+	// 历史误标为直连的文件夹应回到目录树页，不请求文件下载直链。
+	if w := do("dir", "", "document"); w.Code != http.StatusFound || w.Header().Get("Location") != "/s/dir" {
+		t.Fatalf("文件夹应跳转目录树，得 %d %q", w.Code, w.Header().Get("Location"))
 	}
 	// 陌生 Referer 被白名单拦截 → 403 占位图
 	if w := do("img", "https://evil.com", "image"); w.Code != http.StatusForbidden ||

@@ -410,6 +410,10 @@ func generateShareCode() string {
 	return hex.EncodeToString(bytes)
 }
 
+func directShareEnabled(targetType string, requested bool) bool {
+	return targetType == "file" && requested
+}
+
 // CreateShare 创建分享
 func (h *Handler) CreateShare(c *gin.Context) {
 	var req model.CreateShareRequest
@@ -446,9 +450,10 @@ func (h *Handler) CreateShare(c *gin.Context) {
 		}
 	}
 
-	// 直连模式无法交互输入密码，强制清空
+	isDirect := directShareEnabled(req.TargetType, req.IsDirect)
+	// 直连仅支持单文件；文件夹使用 /s/ 目录树分享。
 	password := req.Password
-	if req.IsDirect {
+	if isDirect {
 		password = ""
 	}
 
@@ -463,7 +468,7 @@ func (h *Handler) CreateShare(c *gin.Context) {
 		Description:  req.Description,
 		IsActive:     true,
 		MaxDownloads: req.MaxDownloads,
-		IsDirect:     req.IsDirect,
+		IsDirect:     isDirect,
 	}
 
 	if err := h.shareRepo.Create(share); err != nil {
@@ -560,6 +565,7 @@ func (h *Handler) UpdateShare(c *gin.Context) {
 	if req.IsDirect != nil {
 		share.IsDirect = *req.IsDirect
 	}
+	share.IsDirect = directShareEnabled(share.TargetType, share.IsDirect)
 	// 直连模式无法交互输入密码，强制清空
 	if share.IsDirect {
 		share.Password = ""
@@ -1266,6 +1272,10 @@ func (h *Handler) BatchCreateShare(c *gin.Context) {
 			Description:  item.Description,
 			IsActive:     true,
 			MaxDownloads: item.MaxDownloads,
+			IsDirect:     directShareEnabled(item.TargetType, item.IsDirect),
+		}
+		if share.IsDirect {
+			share.Password = ""
 		}
 
 		if err := h.shareRepo.Create(share); err != nil {

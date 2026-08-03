@@ -291,12 +291,17 @@
               </div>
            </div>
 
-           <div class="form-group">
+           <div v-if="shareForm.target_type === 'file'" class="form-group">
               <label class="brutal-label-tag">直连模式_DIRECT</label>
               <label class="direct-toggle">
                  <input type="checkbox" v-model="shareForm.is_direct">
                  <span>图床 / 外链嵌入（生成 /f/ 链接，不支持密码）</span>
               </label>
+           </div>
+
+           <div v-else class="form-group">
+              <label class="brutal-label-tag">文件夹分享_FOLDER</label>
+              <div class="static-value-box">将生成 /s/ 目录树，可逐级查看子文件夹和文件</div>
            </div>
 
            <div class="form-group">
@@ -1098,7 +1103,7 @@ async function createShare() {
     if (typeof shareForm.value.max_downloads === 'number') {
       data.max_downloads = shareForm.value.max_downloads > 0 ? shareForm.value.max_downloads : 0
     }
-    data.is_direct = shareForm.value.is_direct
+    data.is_direct = shareForm.value.target_type === 'file' && shareForm.value.is_direct
     if (data.is_direct) {
       data.password = ''
     }

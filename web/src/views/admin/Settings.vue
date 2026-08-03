@@ -22,7 +22,7 @@
               placeholder="从浏览器开发者工具获取"
             />
             <div class="form-tip">
-              登录 <a href="https://pan.wo.cn" target="_blank">联通云盘</a> 后，在开发者工具 Network 中找到 refresh_token
+              登录 <a href="https://pan.wo.cn" target="_blank">联通云盘</a> 后，在开发者工具 Network 中找到 refresh_token；只有一个 UUID 时请填到下方 Access Token
             </div>
           </el-form-item>
           <el-form-item label="Access Token">
@@ -33,7 +33,7 @@
               placeholder="与 Refresh Token 一起使用"
             />
             <div class="form-tip">
-              可选：如果只拿到一个 Token，填写在 Refresh Token，Access Token 留空即可
+              可选：最新页面常只显示一个 UUID 令牌，此时填写在这里；Refresh Token 失效时系统也会自动按 Access Token 尝试
             </div>
           </el-form-item>
           <el-form-item>

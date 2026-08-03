@@ -64,3 +64,40 @@ func TestDirectShareAndSettingsRoundtrip(t *testing.T) {
 		t.Fatalf("设置回读错误: %+v", reread)
 	}
 }
+
+func TestMigrationConvertsDirectFolderToTreeShare(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "folder.db")
+	db, err := NewDatabase(dbPath)
+	if err != nil {
+		t.Fatalf("建库失败: %v", err)
+	}
+	repo := NewShareRepository(db.DB())
+	share := &model.Share{
+		ShareCode:  "docs",
+		TargetType: "folder",
+		TargetID:   "dir-id",
+		TargetPath: "/docs",
+		TargetName: "docs",
+		IsActive:   true,
+		IsDirect:   true,
+	}
+	if err := repo.Create(share); err != nil {
+		t.Fatalf("写入历史数据失败: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("关闭数据库失败: %v", err)
+	}
+
+	reopened, err := NewDatabase(dbPath)
+	if err != nil {
+		t.Fatalf("重新迁移失败: %v", err)
+	}
+	defer reopened.Close()
+	got, err := NewShareRepository(reopened.DB()).GetByCode("docs")
+	if err != nil {
+		t.Fatalf("读取分享失败: %v", err)
+	}
+	if got.IsDirect {
+		t.Fatal("文件夹应被迁移为目录树分享")
+	}
+}

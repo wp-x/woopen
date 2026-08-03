@@ -60,8 +60,8 @@ type createDirParams struct {
 
 // createDirectoryLocked 内部创建目录方法（需要持有锁）
 func (c *Client) createDirectoryLocked(client *wopan.WoClient, params createDirParams) (*model.FileInfo, error) {
-	// 与 OpenList 一致：个人云使用 SpaceTypePersonal，familyID 为空
-	result, err := client.CreateDirectory(wopan.SpaceTypePersonal, params.parentID, params.dirName, "", func(req *resty.Request) {
+	// OpenList 在个人云创建目录时也会传入初始化阶段取得的默认家庭空间 ID。
+	result, err := client.CreateDirectory(wopan.SpaceTypePersonal, params.parentID, params.dirName, c.getDefaultFamilyID(), func(req *resty.Request) {
 		req.SetContext(params.ctx)
 	})
 	if err != nil {

@@ -64,7 +64,7 @@
 
 ![复制token](./docs/images/find-token.png)
 
-> 这个 token 先存着，等下要填两遍。
+> 最新页面通常只显示一个 UUID 形式的 Token，它是 Access Token。
 
 <br>
 
@@ -136,7 +136,9 @@ docker-compose up -d --build
 
 登录后台，进「系统设置」，找到「刷新令牌」和「访问令牌」两个框。
 
-把刚才复制的 token 粘贴两次，对，**两个框填一样的**。联通的接口就这样设计的。
+如果只拿到一个 UUID Token，把它填入 **Access Token**，Refresh Token 留空。
+
+如果拿到的是响应字段中明确标记的 `refresh_token`，则填入 **Refresh Token**；系统会自动刷新并保存新的 Access Token。为兼容旧配置，Refresh Token 刷新返回 `8005` 时也会自动按 Access Token 验证。
 
 保存，去「文件管理」看看能不能加载出文件列表，能的话就成了。
 

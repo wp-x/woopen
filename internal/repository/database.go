@@ -138,6 +138,7 @@ func (d *Database) migrate() error {
 
 		// 直连（图床/外链）字段
 		`ALTER TABLE shares ADD COLUMN is_direct BOOLEAN DEFAULT 0`,
+		`UPDATE shares SET is_direct = 0 WHERE target_type = 'folder' AND is_direct = 1`,
 		`ALTER TABLE settings ADD COLUMN direct_referer_whitelist TEXT DEFAULT ''`,
 		`ALTER TABLE settings ADD COLUMN direct_allow_empty_referer BOOLEAN DEFAULT 1`,
 		`ALTER TABLE settings ADD COLUMN direct_rate_limit INTEGER DEFAULT 60`,
