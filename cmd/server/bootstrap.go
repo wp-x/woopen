@@ -77,6 +77,7 @@ func setupRouter(opts routeOptions) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.SecurityHeadersMiddleware())
 	registerRoutes(r, opts)
 	return r
 }
@@ -89,6 +90,7 @@ var webdavWriteMethods = map[string]bool{
 }
 
 func newWebDAVHandler(wopanClient *wopan.Client, settingsRepo *repository.SettingsRepository, adminPassword string) http.Handler {
+	authLimiter := newWebDAVAuthLimiter()
 	davFS := webdav.NewWopanFS(wopanClient)
 	dav := &xwebdav.Handler{
 		Prefix:     "/dav",
@@ -121,6 +123,13 @@ func newWebDAVHandler(wopanClient *wopan.Client, settingsRepo *repository.Settin
 			return
 		}
 
+		clientIP := remoteClientIP(r)
+		if !authLimiter.allow(clientIP) {
+			w.Header().Set("Retry-After", "900")
+			http.Error(w, "Too many authentication attempts", http.StatusTooManyRequests)
+			return
+		}
+
 		user, pass := "admin", adminPassword
 		readonly := false
 		if settings != nil {
@@ -132,8 +141,10 @@ func newWebDAVHandler(wopanClient *wopan.Client, settingsRepo *repository.Settin
 		}
 
 		if !authenticateWebDAV(w, r, user, pass) {
+			authLimiter.recordFailure(clientIP)
 			return
 		}
+		authLimiter.reset(clientIP)
 
 		// 只读模式拒绝一切写操作
 		if readonly && webdavWriteMethods[r.Method] {

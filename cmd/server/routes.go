@@ -94,6 +94,10 @@ func registerAuthRoutes(auth *gin.RouterGroup, h *handler.Handler) {
 func registerFileRoutes(auth *gin.RouterGroup, h *handler.Handler) {
 	auth.GET("/files", h.ListFiles)
 	auth.GET("/files/link", h.GetFileLink)
+	auth.POST("/files/delete", h.DeleteFiles)
+	auth.POST("/files/rename", h.RenameFile)
+	auth.POST("/files/move", h.MoveFiles)
+	auth.POST("/files/copy", h.CopyFiles)
 	auth.POST("/files/upload", h.UploadFile)
 	auth.GET("/files/upload/progress", h.GetUploadProgress)
 	auth.POST("/files/mkdir", h.CreateDirectory)

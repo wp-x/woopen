@@ -40,6 +40,9 @@ func GenerateToken(expire string) (string, error) {
 // ValidateToken 验证JWT Token
 func ValidateToken(tokenString string) bool {
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, jwt.ErrSignatureInvalid
+		}
 		return []byte(JWTSecret), nil
 	})
 	if err != nil {
@@ -100,6 +103,20 @@ func CORSMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		c.Next()
+	}
+}
+
+// SecurityHeadersMiddleware 为公开和管理端响应统一增加基础安全头。
+func SecurityHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "SAMEORIGIN")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Header("Permissions-Policy", "camera=(), geolocation=(), microphone=()")
+		if c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		c.Next()
 	}
 }

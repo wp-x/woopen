@@ -21,7 +21,7 @@
             <div class="tag">{{ siteConfig.login_role_tag }}</div>
             <div class="tag level-tag">{{ siteConfig.login_level_tag }}</div>
           </div>
-          <div class="user-title" v-html="formattedSystemName"></div>
+          <div class="user-title">{{ formattedSystemName }}</div>
           <p class="terminal-text">
             // 终端接入中...<br>
             // 加密节点已就绪<br>
@@ -109,7 +109,7 @@ const isAvatarUrl = computed(() => {
 // 格式化系统名称（用空格分隔换行）
 const formattedSystemName = computed(() => {
   const name = siteConfig.value.login_system_name || 'WOOPEN CLOUD SYSTEM'
-  return name.split(' ').join('<br>')
+  return name.split(' ').join('\n')
 })
 
 // 加载站点配置
@@ -324,6 +324,7 @@ onMounted(() => {
     font-weight: 900;
     margin-bottom: 10px;
     text-transform: uppercase;
+    white-space: pre-line;
 }
 
 .terminal-text {

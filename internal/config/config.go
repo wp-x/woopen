@@ -19,8 +19,8 @@ func DefaultConfig() *Config {
 	return &Config{
 		Port:          getEnv("WOOPEN_PORT", "10010"),
 		DataDir:       getEnv("WOOPEN_DATA_DIR", "./data"),
-		AdminPassword: getEnv("WOOPEN_ADMIN_PASSWORD", "admin123"),
-		JWTSecret:     getEnv("WOOPEN_JWT_SECRET", "woopen-secret-key-change-in-production"),
+		AdminPassword: getEnv("WOOPEN_ADMIN_PASSWORD", ""),
+		JWTSecret:     getEnv("WOOPEN_JWT_SECRET", ""),
 		SiteURL:       getEnv("WOOPEN_SITE_URL", "http://localhost:10010"),
 	}
 }

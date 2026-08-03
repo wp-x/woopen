@@ -22,6 +22,7 @@ type ListCache interface {
 	Get(req ListRequest) ([]*model.FileInfo, bool)
 	Set(req ListRequest, files []*model.FileInfo)
 	InvalidateDir(dirID string)
+	InvalidateAll()
 }
 
 type listTTLCache struct {
@@ -94,6 +95,12 @@ func (c *listTTLCache) InvalidateDir(dirID string) {
 			delete(c.entries, key)
 		}
 	}
+	c.mu.Unlock()
+}
+
+func (c *listTTLCache) InvalidateAll() {
+	c.mu.Lock()
+	c.entries = make(map[listCacheKey]listCacheEntry)
 	c.mu.Unlock()
 }
 

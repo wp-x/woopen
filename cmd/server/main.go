@@ -12,6 +12,12 @@ import (
 func main() {
 	// 加载配置
 	cfg := config.DefaultConfig()
+	if len(cfg.AdminPassword) < 12 {
+		log.Fatal("WOOPEN_ADMIN_PASSWORD 未配置或长度不足 12 位")
+	}
+	if len(cfg.JWTSecret) < 32 {
+		log.Fatal("WOOPEN_JWT_SECRET 未配置或长度不足 32 位")
+	}
 	logStartup(cfg)
 
 	// 设置JWT密钥

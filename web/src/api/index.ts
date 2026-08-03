@@ -59,6 +59,12 @@ export const fileApi = {
     list: (dirId?: string, page = 1, pageSize = 50) =>
         api.get('/files', { params: { dir_id: dirId, page, page_size: pageSize } }),
     link: (fid: string) => api.get('/files/link', { params: { fid } }),
+    delete: (items: Array<{ id: string; is_dir: boolean }>) => api.post('/files/delete', { items }),
+    rename: (data: { id: string; is_dir: boolean; name: string }) => api.post('/files/rename', data),
+    move: (items: Array<{ id: string; is_dir: boolean }>, targetDirId: string) =>
+        api.post('/files/move', { items, target_dir_id: targetDirId }),
+    copy: (items: Array<{ id: string; is_dir: boolean }>, targetDirId: string) =>
+        api.post('/files/copy', { items, target_dir_id: targetDirId }),
     uploadProgress: (uploadId: string) =>
         api.get('/files/upload/progress', { params: { upload_id: uploadId } }),
     upload: (file: File, parentId?: string, onProgress?: (percent: number) => void, uploadId?: string) => {

@@ -10,6 +10,7 @@ services:
       - ./data:/data
     environment:
       - WOOPEN_ADMIN_PASSWORD=your_secure_password
+      - WOOPEN_JWT_SECRET=replace_with_a_random_secret_at_least_32_chars
       - WOOPEN_SITE_URL=https://your-domain.com
       - TZ=Asia/Shanghai
     restart: unless-stopped

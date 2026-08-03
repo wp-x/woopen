@@ -97,6 +97,7 @@ services:
       - ./data:/data
     environment:
       - WOOPEN_ADMIN_PASSWORD=改成你的密码
+      - WOOPEN_JWT_SECRET=生成一个至少 32 位的随机密钥
       - WOOPEN_PORT=10010
       - TZ=Asia/Shanghai
     restart: unless-stopped
@@ -148,7 +149,8 @@ docker-compose up -d --build
 
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
-| `WOOPEN_ADMIN_PASSWORD` | 登录密码 | admin123 |
+| `WOOPEN_ADMIN_PASSWORD` | 登录密码（至少 12 位） | 必填 |
+| `WOOPEN_JWT_SECRET` | JWT 密钥（至少 32 位随机字符） | 必填 |
 | `WOOPEN_PORT` | 端口 | 10010 |
 | `WOOPEN_SITE_URL` | 域名 | 空 |
 

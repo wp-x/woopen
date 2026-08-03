@@ -15,10 +15,19 @@
             </el-button>
           </el-breadcrumb-item>
         </el-breadcrumb>
-        <div class="breadcrumb-actions" v-if="selectedFiles.length > 0">
-          <el-tag type="info" size="small">已选择 {{ selectedFiles.length }} 项</el-tag>
-          <el-button type="primary" size="small" @click="openBatchShareDialog">
-            <el-icon><Share /></el-icon> 批量分享
+        <div class="breadcrumb-actions">
+          <template v-if="selectedFiles.length > 0">
+            <el-tag class="selection-count" type="info" size="small">已选择 {{ selectedFiles.length }} 项</el-tag>
+            <el-button v-if="selectedFiles.length === 1" class="file-action-button file-action-neutral" size="small" @click="renameSelected">重命名</el-button>
+            <el-button class="file-action-button file-action-neutral" size="small" @click="prepareClipboard('copy')">复制</el-button>
+            <el-button class="file-action-button file-action-neutral" size="small" @click="prepareClipboard('move')">移动</el-button>
+            <el-button class="file-action-button file-action-delete" size="small" type="danger" @click="deleteSelected">删除</el-button>
+            <el-button class="file-action-button file-action-share" type="primary" size="small" @click="openBatchShareDialog">
+              <el-icon><Share /></el-icon> 批量分享
+            </el-button>
+          </template>
+          <el-button v-if="clipboardItems.length > 0" class="file-action-button file-action-paste paste-button" size="small" type="success" @click="pasteClipboard">
+            粘贴 ({{ clipboardItems.length }})
           </el-button>
         </div>
       </div>
@@ -610,6 +619,7 @@ import {
   UploadFilled, FolderAdd
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { fileApi, shareApi } from '../../api'
 
 interface FileInfo {
@@ -627,6 +637,8 @@ const files = ref<FileInfo[]>([])
 const currentDirId = ref('')
 const breadcrumbs = ref<{ id: string; name: string }[]>([])
 const selectedFiles = ref<FileInfo[]>([])
+const clipboardItems = ref<FileInfo[]>([])
+const clipboardMode = ref<'copy' | 'move'>('copy')
 
 const uiStore = useUIStore()
 
@@ -960,6 +972,70 @@ function handleSelectionChange(selection: FileInfo[]) {
   selectedFiles.value = selection
 }
 
+function operationID(file: FileInfo): { id: string; is_dir: boolean } {
+  // 文件操作接口使用列表返回的 id；fid 仅用于下载/直链。
+  return { id: file.id, is_dir: file.is_dir }
+}
+
+function prepareClipboard(mode: 'copy' | 'move') {
+  clipboardItems.value = [...selectedFiles.value]
+  clipboardMode.value = mode
+  ElMessage.success(mode === 'copy' ? '已复制，请进入目标目录后点击粘贴' : '已剪切，请进入目标目录后点击粘贴')
+}
+
+async function pasteClipboard() {
+  if (clipboardItems.value.length === 0) return
+  const items = clipboardItems.value.map(operationID)
+  try {
+    if (clipboardMode.value === 'copy') {
+      await fileApi.copy(items, currentDirId.value || '0')
+    } else {
+      await fileApi.move(items, currentDirId.value || '0')
+      clipboardItems.value = []
+    }
+    ElMessage.success(clipboardMode.value === 'copy' ? '粘贴成功' : '移动成功')
+    selectedFiles.value = []
+    loadFiles()
+  } catch {
+    // 错误已由 API 拦截器提示
+  }
+}
+
+async function renameSelected() {
+  const file = selectedFiles.value[0]
+  if (!file) return
+  try {
+    const result = await ElMessageBox.prompt('请输入新名称', '重命名', {
+      inputValue: file.name,
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValidator: (value) => value.trim() ? true : '名称不能为空'
+    })
+    await fileApi.rename({ ...operationID(file), name: result.value.trim() })
+    ElMessage.success('重命名成功')
+    loadFiles()
+  } catch {
+    // 取消或错误已处理
+  }
+}
+
+async function deleteSelected() {
+  if (selectedFiles.value.length === 0) return
+  try {
+    await ElMessageBox.confirm(`确定删除选中的 ${selectedFiles.value.length} 项？文件夹中的内容也会被删除。`, '删除确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await fileApi.delete(selectedFiles.value.map(operationID))
+    ElMessage.success('删除成功')
+    selectedFiles.value = []
+    loadFiles()
+  } catch {
+    // 取消或错误已处理
+  }
+}
+
 function toggleSelect(file: FileInfo) {
   const index = selectedFiles.value.indexOf(file)
   if (index >= 0) {
@@ -1244,6 +1320,79 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.paste-button {
+  color: #000 !important;
+}
+
+.breadcrumb-actions {
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-left: auto;
+  padding-right: 8px;
+}
+
+.breadcrumb-actions :deep(.el-tag) {
+  margin-right: 4px;
+}
+
+.breadcrumb-actions :deep(.selection-count) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 14px !important;
+  border: 3px solid var(--pure-black) !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 var(--pure-black) !important;
+  background: var(--pure-white) !important;
+  color: var(--pure-black) !important;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.breadcrumb-actions :deep(.file-action-button) {
+  min-height: 38px;
+  padding: 8px 18px !important;
+  border: 3px solid var(--pure-black) !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 var(--pure-black) !important;
+  font-weight: 900 !important;
+  transition: transform 0.1s, box-shadow 0.1s, background-color 0.1s;
+}
+
+.breadcrumb-actions :deep(.file-action-neutral) {
+  background: var(--pure-white) !important;
+  color: var(--pure-black) !important;
+}
+
+.breadcrumb-actions :deep(.file-action-share) {
+  background: var(--pure-black) !important;
+  color: var(--pure-white) !important;
+}
+
+.breadcrumb-actions :deep(.file-action-delete) {
+  background: #ff0000 !important;
+  color: var(--pure-white) !important;
+}
+
+.breadcrumb-actions :deep(.file-action-paste) {
+  background: var(--acid-green) !important;
+  color: var(--pure-black) !important;
+}
+
+.breadcrumb-actions :deep(.file-action-button:hover) {
+  background: var(--acid-pink) !important;
+  color: var(--pure-black) !important;
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--pure-black) !important;
+}
+
+.breadcrumb-actions :deep(.file-action-button:active) {
+  transform: translate(2px, 2px);
+  box-shadow: none !important;
+}
+</style>
+
+<style scoped>
 .files-page {
   max-width: 1400px;
 }
@@ -1261,7 +1410,7 @@ onMounted(() => {
 .breadcrumb-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
 }
 
 .files-card {

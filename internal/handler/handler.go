@@ -51,6 +51,8 @@ type Handler struct {
 	listCache           ListCache
 	directCache         DirectURLCache
 	directLimiter       *directRateLimiter
+	loginLimiter        *loginFailureLimiter
+	shareLimiter        *sharePasswordLimiter
 
 	// uploadProgress holds best-effort server-side upload progress keyed by upload_id.
 	// Used by the admin UI polling endpoint to show real progress during Upload2C.
@@ -85,7 +87,30 @@ func NewHandler(opts HandlerOptions) *Handler {
 		listCache:           opts.ListCache,
 		directCache:         NewDirectURLCache(DefaultDirectURLCacheTTL),
 		directLimiter:       newDirectRateLimiter(),
+		loginLimiter:        newLoginFailureLimiter(),
+		shareLimiter:        newSharePasswordLimiter(),
 	}
+}
+
+func sharePasswordKey(c *gin.Context) string {
+	return c.RemoteIP() + "|" + c.Param("code")
+}
+
+func (h *Handler) checkSharePasswordAttempt(c *gin.Context) bool {
+	if h.shareLimiter.allow(sharePasswordKey(c)) {
+		return true
+	}
+	c.Header("Retry-After", "900")
+	c.JSON(http.StatusTooManyRequests, model.APIResponse{Code: 429, Message: "密码尝试过多，请稍后再试"})
+	return false
+}
+
+func (h *Handler) recordSharePasswordFailure(c *gin.Context) {
+	h.shareLimiter.recordFailure(sharePasswordKey(c))
+}
+
+func (h *Handler) resetSharePasswordFailures(c *gin.Context) {
+	h.shareLimiter.reset(sharePasswordKey(c))
 }
 
 // SetMonitorService 设置监控服务
@@ -150,6 +175,13 @@ func (h *Handler) GetSiteConfig(c *gin.Context) {
 
 // Login 管理员登录
 func (h *Handler) Login(c *gin.Context) {
+	clientIP := c.RemoteIP()
+	if !h.loginLimiter.allow(clientIP) {
+		c.Header("Retry-After", "900")
+		c.JSON(http.StatusTooManyRequests, model.APIResponse{Code: 429, Message: "登录尝试过多，请稍后再试"})
+		return
+	}
+
 	var req model.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.APIResponse{
@@ -161,12 +193,14 @@ func (h *Handler) Login(c *gin.Context) {
 
 	// 验证密码
 	if req.Password != h.adminPassword {
+		h.loginLimiter.recordFailure(clientIP)
 		c.JSON(http.StatusUnauthorized, model.APIResponse{
 			Code:    401,
 			Message: "密码错误",
 		})
 		return
 	}
+	h.loginLimiter.reset(clientIP)
 
 	// 生成Token
 	token, err := middleware.GenerateToken(req.Expire)
@@ -249,6 +283,104 @@ func (h *Handler) ListFiles(c *gin.Context) {
 			"page":  page,
 		},
 	})
+}
+
+type fileOperationItem struct {
+	ID    string `json:"id" binding:"required"`
+	IsDir bool   `json:"is_dir"`
+}
+
+type fileOperationRequest struct {
+	Items       []fileOperationItem `json:"items" binding:"required,min=1"`
+	TargetDirID string              `json:"target_dir_id"`
+}
+
+type renameFileRequest struct {
+	ID    string `json:"id" binding:"required"`
+	IsDir bool   `json:"is_dir"`
+	Name  string `json:"name" binding:"required"`
+}
+
+func (h *Handler) DeleteFiles(c *gin.Context) {
+	var req fileOperationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fileOperationError(c, http.StatusBadRequest, "请求参数错误: "+err.Error())
+		return
+	}
+	dirIDs, fileIDs := splitFileOperationItems(req.Items)
+	if err := h.wopanClient.DeleteBatch(c.Request.Context(), dirIDs, fileIDs); err != nil {
+		fileOperationError(c, http.StatusBadGateway, "删除失败: "+err.Error())
+		return
+	}
+	h.listCache.InvalidateAll()
+	c.JSON(http.StatusOK, model.APIResponse{Code: 0, Message: "删除成功"})
+}
+
+func (h *Handler) RenameFile(c *gin.Context) {
+	var req renameFileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fileOperationError(c, http.StatusBadRequest, "请求参数错误: "+err.Error())
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		fileOperationError(c, http.StatusBadRequest, "名称不能为空")
+		return
+	}
+	if err := h.wopanClient.Rename(c.Request.Context(), req.IsDir, req.ID, name); err != nil {
+		fileOperationError(c, http.StatusBadGateway, "重命名失败: "+err.Error())
+		return
+	}
+	h.listCache.InvalidateAll()
+	c.JSON(http.StatusOK, model.APIResponse{Code: 0, Message: "重命名成功"})
+}
+
+func (h *Handler) MoveFiles(c *gin.Context) {
+	h.handleCopyMove(c, false)
+}
+
+func (h *Handler) CopyFiles(c *gin.Context) {
+	h.handleCopyMove(c, true)
+}
+
+func (h *Handler) handleCopyMove(c *gin.Context, copyMode bool) {
+	var req fileOperationRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.TargetDirID) == "" {
+		fileOperationError(c, http.StatusBadRequest, "必须提供目标目录")
+		return
+	}
+	dirIDs, fileIDs := splitFileOperationItems(req.Items)
+	var err error
+	verb := "移动"
+	if copyMode {
+		err = h.wopanClient.CopyBatch(c.Request.Context(), dirIDs, fileIDs, req.TargetDirID)
+		verb = "复制"
+	} else {
+		err = h.wopanClient.MoveBatch(c.Request.Context(), dirIDs, fileIDs, req.TargetDirID)
+	}
+	if err != nil {
+		fileOperationError(c, http.StatusBadGateway, verb+"失败: "+err.Error())
+		return
+	}
+	h.listCache.InvalidateAll()
+	c.JSON(http.StatusOK, model.APIResponse{Code: 0, Message: "操作成功"})
+}
+
+func splitFileOperationItems(items []fileOperationItem) ([]string, []string) {
+	dirIDs := make([]string, 0, len(items))
+	fileIDs := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.IsDir {
+			dirIDs = append(dirIDs, item.ID)
+			continue
+		}
+		fileIDs = append(fileIDs, item.ID)
+	}
+	return dirIDs, fileIDs
+}
+
+func fileOperationError(c *gin.Context, status int, message string) {
+	c.JSON(status, model.APIResponse{Code: status, Message: message})
 }
 
 // GetFileLink 获取文件下载直链（仅文件）
@@ -689,6 +821,9 @@ func (h *Handler) AccessShare(c *gin.Context) {
 // VerifySharePassword 验证分享密码
 func (h *Handler) VerifySharePassword(c *gin.Context) {
 	code := c.Param("code")
+	if !h.checkSharePasswordAttempt(c) {
+		return
+	}
 
 	var req struct {
 		Password string `json:"password"`
@@ -711,12 +846,14 @@ func (h *Handler) VerifySharePassword(c *gin.Context) {
 	}
 
 	if share.Password != req.Password {
+		h.recordSharePasswordFailure(c)
 		c.JSON(http.StatusUnauthorized, model.APIResponse{
 			Code:    401,
 			Message: "密码错误",
 		})
 		return
 	}
+	h.resetSharePasswordFailures(c)
 
 	c.JSON(http.StatusOK, model.APIResponse{
 		Code:    0,
@@ -764,12 +901,17 @@ func (h *Handler) DownloadShare(c *gin.Context) {
 	if share.Password != "" {
 		pwd := c.Query("pwd")
 		if pwd != share.Password {
+			if !h.checkSharePasswordAttempt(c) {
+				return
+			}
+			h.recordSharePasswordFailure(c)
 			c.JSON(http.StatusUnauthorized, model.APIResponse{
 				Code:    401,
 				Message: "需要密码验证",
 			})
 			return
 		}
+		h.resetSharePasswordFailures(c)
 	}
 
 	// 检查下载次数限制
@@ -1320,12 +1462,17 @@ func (h *Handler) GetShareFiles(c *gin.Context) {
 	if share.Password != "" {
 		pwd := c.Query("pwd")
 		if pwd != share.Password {
+			if !h.checkSharePasswordAttempt(c) {
+				return
+			}
+			h.recordSharePasswordFailure(c)
 			c.JSON(http.StatusUnauthorized, model.APIResponse{
 				Code:    401,
 				Message: "需要密码验证",
 			})
 			return
 		}
+		h.resetSharePasswordFailures(c)
 	}
 
 	// 只有文件夹分享才能获取子文件列表
@@ -1480,12 +1627,17 @@ func (h *Handler) PreviewShare(c *gin.Context) {
 	if share.Password != "" {
 		pwd := c.Query("pwd")
 		if pwd != share.Password {
+			if !h.checkSharePasswordAttempt(c) {
+				return
+			}
+			h.recordSharePasswordFailure(c)
 			c.JSON(http.StatusUnauthorized, model.APIResponse{
 				Code:    401,
 				Message: "需要密码验证",
 			})
 			return
 		}
+		h.resetSharePasswordFailures(c)
 	}
 
 	if fileID == "" || fileID == "0" {
