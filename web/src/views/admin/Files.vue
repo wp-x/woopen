@@ -530,8 +530,10 @@
              <iframe v-if="previewType === 'pdf'" :src="previewUrl" style="width:100%; height:100%; border:none;"></iframe>
              <audio v-else-if="previewType === 'audio'" :src="previewUrl" controls style="margin: 50px auto; display:block;"></audio>
              <div v-else-if="previewType === 'text'" style="padding: 20px;">
-                <pre v-if="textContent" style="white-space: pre-wrap; word-wrap: break-word;">{{ textContent }}</pre>
-                <div v-else>载入中...</div>
+                <article v-if="!previewLoading && !previewError && isMarkdown" class="markdown-preview" v-html="renderedMarkdown"></article>
+                <pre v-else-if="!previewLoading && !previewError" style="white-space: pre-wrap; word-wrap: break-word;">{{ textContent }}</pre>
+                <div v-else-if="previewLoading">载入中...</div>
+                <div v-else>预览加载失败</div>
              </div>
              <div v-else style="padding: 50px; text-align: center;">此文件类型不支持预览</div>
           </div>
@@ -621,6 +623,7 @@ import {
 import { ElMessage } from 'element-plus'
 import { ElMessageBox } from 'element-plus'
 import { fileApi, shareApi } from '../../api'
+import { decodeTextContent, renderMarkdown } from '../../utils/textPreview'
 
 interface FileInfo {
   id: string
@@ -918,6 +921,8 @@ const previewExtension = ref('')
 const previewFileItem = ref<FileInfo | null>(null)
 const previewError = ref(false)
 const textContent = ref('')
+const isMarkdown = computed(() => ['md', 'markdown'].includes(previewExtension.value.toLowerCase()))
+const renderedMarkdown = computed(() => isMarkdown.value ? renderMarkdown(textContent.value) : '')
 // 图片/视频 额外数据
 const imgResolution = ref('Loading...')
 const videoTimeCode = ref('00:00:00:00')
@@ -1114,18 +1119,16 @@ async function openPreview(file: FileInfo) {
 
   try {
     const fid = file.fid || file.id
-    const res = await fileApi.link(fid)
-    previewUrl.value = res.data.url
-
     if (previewType.value === 'text') {
-      fetch(previewUrl.value)
-        .then(res => res.text())
-        .then(text => { textContent.value = text })
-        .catch(() => { previewError.value = true })
+      const res = await fileApi.content(fid)
+      textContent.value = decodeTextContent(res.data.content_base64)
+    } else {
+      const res = await fileApi.link(fid)
+      previewUrl.value = res.data.url
     }
   } catch (error) {
     previewError.value = true
-    uiStore.showToast('error', '预览错误', '无法获取文件链接')
+    uiStore.showToast('error', '预览错误', '无法加载文件预览')
   } finally {
     previewLoading.value = false
   }

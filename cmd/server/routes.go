@@ -63,6 +63,7 @@ func registerShareRoutes(r *gin.Engine, h *handler.Handler, dist distInfo) {
 	r.GET("/s/:code/download/:fileId", h.DownloadShare)
 	r.GET("/s/:code/preview", h.PreviewShare)
 	r.GET("/s/:code/preview/:fileId", h.PreviewShare)
+	r.GET("/s/:code/content", h.GetShareFileContent)
 	r.GET("/s/:code/files", h.GetShareFiles)
 	r.GET("/s/:code/info", h.GetFilePreviewInfo)
 
@@ -94,6 +95,7 @@ func registerAuthRoutes(auth *gin.RouterGroup, h *handler.Handler) {
 func registerFileRoutes(auth *gin.RouterGroup, h *handler.Handler) {
 	auth.GET("/files", h.ListFiles)
 	auth.GET("/files/link", h.GetFileLink)
+	auth.GET("/files/content", h.GetFileContent)
 	auth.POST("/files/delete", h.DeleteFiles)
 	auth.POST("/files/rename", h.RenameFile)
 	auth.POST("/files/move", h.MoveFiles)

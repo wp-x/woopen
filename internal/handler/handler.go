@@ -49,6 +49,7 @@ type Handler struct {
 	adminPassword       string
 	monitorService      MonitorServiceInterface
 	listCache           ListCache
+	httpClient          HTTPDoer
 	directCache         DirectURLCache
 	directLimiter       *directRateLimiter
 	loginLimiter        *loginFailureLimiter
@@ -69,12 +70,16 @@ type HandlerOptions struct {
 	WopanClient         *wopan.Client
 	AdminPassword       string
 	ListCache           ListCache
+	HTTPClient          HTTPDoer
 }
 
 // NewHandler 创建Handler
 func NewHandler(opts HandlerOptions) *Handler {
 	if opts.ListCache == nil {
 		panic("list cache is required")
+	}
+	if opts.HTTPClient == nil {
+		panic("http client is required")
 	}
 	return &Handler{
 		settingsRepo:        opts.SettingsRepo,
@@ -85,6 +90,7 @@ func NewHandler(opts HandlerOptions) *Handler {
 		wopanClient:         opts.WopanClient,
 		adminPassword:       opts.AdminPassword,
 		listCache:           opts.ListCache,
+		httpClient:          opts.HTTPClient,
 		directCache:         NewDirectURLCache(DefaultDirectURLCacheTTL),
 		directLimiter:       newDirectRateLimiter(),
 		loginLimiter:        newLoginFailureLimiter(),

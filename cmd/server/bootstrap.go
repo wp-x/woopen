@@ -55,6 +55,7 @@ func initHandler(repos repoBundle, wopanClient *wopan.Client, adminPassword stri
 		WopanClient:         wopanClient,
 		AdminPassword:       adminPassword,
 		ListCache:           listCache,
+		HTTPClient:          http.DefaultClient,
 	})
 }
 

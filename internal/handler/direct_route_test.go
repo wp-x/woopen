@@ -36,6 +36,7 @@ func TestDirectLinkRouteHotlink(t *testing.T) {
 		ShareRepo:     shareRepo,
 		AccessLogRepo: repository.NewAccessLogRepository(db.DB()),
 		ListCache:     NewListTTLCache(DefaultListCacheTTL),
+		HTTPClient:    http.DefaultClient,
 	})
 	r := gin.New()
 	r.Use(gin.Recovery()) // 与生产 gin.Default() 一致：上游不可用时 panic→500，不崩测试

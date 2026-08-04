@@ -59,6 +59,9 @@ export const fileApi = {
     list: (dirId?: string, page = 1, pageSize = 50) =>
         api.get('/files', { params: { dir_id: dirId, page, page_size: pageSize } }),
     link: (fid: string) => api.get('/files/link', { params: { fid } }),
+    content: (fid: string) => api.get('/files/content', {
+        params: { fid, request_nonce: Date.now() }
+    }),
     delete: (items: Array<{ id: string; is_dir: boolean }>) => api.post('/files/delete', { items }),
     rename: (data: { id: string; is_dir: boolean; name: string }) => api.post('/files/rename', data),
     move: (items: Array<{ id: string; is_dir: boolean }>, targetDirId: string) =>
@@ -199,6 +202,13 @@ export const publicApi = {
         if (pwd) params.set('pwd', pwd)
         const qs = params.toString()
         return `/s/${code}/preview${qs ? '?' + qs : ''}`
+    },
+    getTextContent: (code: string, fileId?: string, pwd?: string) => {
+        const params: Record<string, string> = {}
+        if (fileId) params.fid = fileId
+        if (pwd) params.pwd = pwd
+        params.request_nonce = String(Date.now())
+        return axios.get(`/s/${code}/content`, { params }).then(res => res.data)
     }
 }
 

@@ -255,8 +255,9 @@
              <iframe v-if="previewType === 'pdf'" :src="previewUrl" style="width:100%; height:100%; border:none;"></iframe>
              <audio v-else-if="previewType === 'audio'" :src="previewUrl" controls style="margin: 50px auto; display:block;"></audio>
              <div v-else-if="previewType === 'text'" style="padding: 20px;">
-                <pre v-if="textContent" style="white-space: pre-wrap; word-wrap: break-word;">{{ textContent }}</pre>
-                <div v-else>载入中...</div>
+                <article v-if="!textLoading && !previewError && isMarkdown" class="markdown-preview" v-html="renderedMarkdown"></article>
+                <pre v-else-if="!textLoading && !previewError" style="white-space: pre-wrap; word-wrap: break-word;">{{ textContent }}</pre>
+                <div v-else-if="textLoading">载入中...</div>
              </div>
              <div v-if="previewError" style="padding: 50px; text-align: center; color: red;">预览加载失败</div>
           </div>
@@ -276,6 +277,7 @@ import {
   Picture, VideoPlay, Headset, Document as DocIcon
 } from '@element-plus/icons-vue'
 import { publicApi } from '../../api'
+import { decodeTextContent, renderMarkdown } from '../../utils/textPreview'
 
 const uiStore = useUIStore() 
 
@@ -326,6 +328,9 @@ const previewFileName = ref('')
 const previewUrl = ref('')
 const previewError = ref(false)
 const textContent = ref('')
+const textLoading = ref(false)
+const isMarkdown = computed(() => ['md', 'markdown'].includes(previewFileName.value.split('.').pop()?.toLowerCase() || ''))
+const renderedMarkdown = computed(() => isMarkdown.value ? renderMarkdown(textContent.value) : '')
 const imgResolution = ref('Analyzing...')
 const videoTimeCode = ref('00:00:00:00')
 let videoTimer: any = null
@@ -348,10 +353,11 @@ function onImageLoad(e: Event) {
 }
 
 function closePreview() {
-    showPreview.value = false
-    previewUrl.value = ''
-    textContent.value = ''
-    stopVideoTimer()
+  showPreview.value = false
+  previewUrl.value = ''
+  textContent.value = ''
+  textLoading.value = false
+  stopVideoTimer()
 }
 
 
@@ -503,12 +509,14 @@ function downloadFolderFile(file: any) {
 
 function canPreview(fileName: string): boolean {
   const ext = fileName.split('.').pop()?.toLowerCase() || ''
-  const previewableExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mp3', 'wav', 'pdf']
+  const previewableExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mp3', 'wav', 'pdf', 'txt', 'md', 'json', 'xml', 'yaml', 'yml', 'log']
   return previewableExts.includes(ext)
 }
 
 function previewFolderFile(file: any) {
   previewFileName.value = file.name
+  previewError.value = false
+  textContent.value = ''
   const fileId = file.fid || file.id
   previewUrl.value = publicApi.getPreviewUrl(code, fileId, needPassword.value ? password.value : undefined)
   
@@ -516,12 +524,17 @@ function previewFolderFile(file: any) {
   const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp']
   const videoExts = ['mp4', 'webm']
   const audioExts = ['mp3', 'wav']
+  const textExts = ['txt', 'md', 'json', 'xml', 'yaml', 'yml', 'log']
   
   if (imageExts.includes(ext)) previewType.value = 'image'
   else if (videoExts.includes(ext)) previewType.value = 'video'
   else if (audioExts.includes(ext)) previewType.value = 'audio'
+  else if (textExts.includes(ext)) previewType.value = 'text'
   else if (ext === 'pdf') previewType.value = 'pdf'
-  
+
+  if (previewType.value === 'text') {
+    loadTextContent(fileId)
+  }
   showPreview.value = true
 }
 
@@ -565,13 +578,22 @@ watch(showPreview, (val) => {
     previewUrl.value = publicApi.getPreviewUrl(code, undefined, needPassword.value ? password.value : undefined)
     previewError.value = false
     if (previewType.value === 'text') {
-      fetch(previewUrl.value)
-        .then(res => res.text())
-        .then(text => { textContent.value = text })
-        .catch(() => { previewError.value = true })
+      loadTextContent()
     }
   }
 })
+
+async function loadTextContent(fileId?: string) {
+  textLoading.value = true
+  try {
+    const res = await publicApi.getTextContent(code, fileId, needPassword.value ? password.value : undefined)
+    textContent.value = decodeTextContent(res.data.content_base64)
+  } catch {
+    previewError.value = true
+  } finally {
+    textLoading.value = false
+  }
+}
 
 // Listen specific key for share view
 function handleKeydown(e: KeyboardEvent) {
