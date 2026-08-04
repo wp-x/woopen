@@ -85,8 +85,6 @@ nano docker-compose.yml
 粘贴以下内容，**密码记得改**：
 
 ```yaml
-version: '3.8'
-
 services:
   woopen:
     image: ghcr.io/wp-x/woopen:latest
@@ -96,17 +94,19 @@ services:
     volumes:
       - ./data:/data
     environment:
-      - WOOPEN_ADMIN_PASSWORD=改成你的密码
-      - WOOPEN_JWT_SECRET=生成一个至少 32 位的随机密钥
+      - WOOPEN_ADMIN_PASSWORD=改成至少12位的登录密码
+      - WOOPEN_JWT_SECRET=改成至少32位的随机密钥
       - WOOPEN_PORT=10010
       - TZ=Asia/Shanghai
     restart: unless-stopped
 ```
 
+镜像同时支持 `linux/amd64` 和 `linux/arm64`，可用于常见的 x86_64 服务器及 ARM64 NAS/服务器。
+
 保存退出，启动：
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 浏览器打开 `http://服务器IP:10010`
@@ -126,7 +126,7 @@ cd woopen
 改一下 `docker-compose.yml` 里的密码，然后：
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 浏览器打开 `http://服务器IP:10010`
@@ -146,6 +146,10 @@ docker-compose up -d --build
 <br>
 
 ## 环境变量
+
+> 从旧版升级：新版启动时会强制检查管理员密码和 JWT 密钥。旧 Compose 如果缺少
+> `WOOPEN_JWT_SECRET`，容器会反复重启。请先补齐下面两个必填变量，再执行
+> `docker compose pull && docker compose up -d --force-recreate`。
 
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
