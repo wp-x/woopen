@@ -13,15 +13,17 @@ import (
 
 // wopanFile 实现 webdav.File 接口（文件）
 type wopanFile struct {
-	fs       *WopanFS
-	name     string
-	fileID   string
-	parentID string
-	fileName string
-	flag     int
-	isNew    bool
-	fileInfo os.FileInfo
-	reader   io.ReadCloser
+	fs     *WopanFS
+	name   string
+	fileID string
+	// downloadID 是获取下载直链用的 fid（联通接口只认 fid），与操作接口使用的 id 区分。
+	downloadID string
+	parentID   string
+	fileName   string
+	flag       int
+	isNew      bool
+	fileInfo   os.FileInfo
+	reader     io.ReadCloser
 
 	// overwriteFileID is set when this handle represents an overwrite operation
 	// (write to an existing file). We upload a new object and then delete the old one.
@@ -71,7 +73,11 @@ func (f *wopanFile) Close() error {
 func (f *wopanFile) Read(p []byte) (n int, err error) {
 	if f.reader == nil {
 		// 获取下载链接并创建 reader（走缓存 + singleflight）
-		downloadURL, err := f.fs.DownloadURL(f.fileID)
+		downloadID := f.downloadID
+		if downloadID == "" {
+			downloadID = f.fileID
+		}
+		downloadURL, err := f.fs.DownloadURL(downloadID)
 		if err != nil {
 			return 0, err
 		}
@@ -160,10 +166,10 @@ func (f *wopanFile) Stat() (os.FileInfo, error) {
 	if f.isNew {
 		size := f.writeLen
 		return &fileInfo{
-			name:    f.fileName,
-			size:    size,
-			mode:    0644,
-			isDir:   false,
+			name:  f.fileName,
+			size:  size,
+			mode:  0644,
+			isDir: false,
 		}, nil
 	}
 

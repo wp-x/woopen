@@ -135,11 +135,12 @@ func (fs *WopanFS) OpenFile(ctx context.Context, name string, flag int, perm os.
 	}
 
 	return fs.openExistingFile(openExistingFileParams{
-		name:     cleanName,
-		fileID:   id,
-		parentID: parentID,
-		info:     fs.fileInfoFromModel(info),
-		flag:     flag,
+		name:       cleanName,
+		fileID:     id,
+		downloadID: DownloadIDFor(info),
+		parentID:   parentID,
+		info:       fs.fileInfoFromModel(info),
+		flag:       flag,
 	})
 }
 

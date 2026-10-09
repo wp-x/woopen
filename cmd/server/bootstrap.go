@@ -193,7 +193,12 @@ func newWebDAVHandler(wopanClient *wopan.Client, settingsRepo *repository.Settin
 			}
 
 			if resolved.Info != nil {
-				downloadURL, err := davFS.DownloadURL(resolved.ID)
+				// 联通下载接口要求 fid，十六进制 id 会被拒绝（rsp_code 1000）。
+				downloadID := webdav.DownloadIDFor(resolved.Info)
+				if downloadID == "" {
+					downloadID = resolved.ID
+				}
+				downloadURL, err := davFS.DownloadURL(downloadID)
 				if err != nil {
 					http.Error(w, "WebDAV redirect failed: "+err.Error(), http.StatusBadGateway)
 					return

@@ -48,11 +48,12 @@ func (fs *WopanFS) createFile(ctx context.Context, params createFileParams) (web
 }
 
 type openExistingFileParams struct {
-	name     string
-	fileID   string
-	parentID string
-	info     os.FileInfo
-	flag     int
+	name       string
+	fileID     string
+	downloadID string
+	parentID   string
+	info       os.FileInfo
+	flag       int
 }
 
 // openExistingFile 打开已存在的文件
@@ -83,13 +84,26 @@ func (fs *WopanFS) openExistingFile(params openExistingFileParams) (webdav.File,
 	}
 
 	return &wopanFile{
-		fs:       fs,
-		name:     params.name,
-		fileID:   params.fileID,
-		flag:     params.flag,
-		isNew:    false,
-		fileInfo: params.info,
+		fs:         fs,
+		name:       params.name,
+		fileID:     params.fileID,
+		downloadID: params.downloadID,
+		flag:       params.flag,
+		isNew:      false,
+		fileInfo:   params.info,
 	}, nil
+}
+
+// DownloadIDFor 返回用于获取下载链接的标识：联通下载接口要求 fid，
+// 列表返回的 id 会被拒绝（rsp_code 1000）；fid 缺失时回退 id 保持旧行为。
+func DownloadIDFor(info *model.FileInfo) string {
+	if info == nil {
+		return ""
+	}
+	if info.FID != "" {
+		return info.FID
+	}
+	return info.ID
 }
 
 // openDirectory 打开目录
