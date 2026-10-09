@@ -10,6 +10,7 @@ start.sh
 
 # Logs
 *.log
+.env
 
 # Data & Database
 data/
