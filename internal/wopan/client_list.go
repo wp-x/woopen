@@ -1,6 +1,7 @@
 package wopan
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -9,10 +10,22 @@ import (
 	"woopen/internal/model"
 
 	"github.com/OpenListTeam/wopan-sdk-go"
+	"resty.dev/v3"
 )
 
 // ListFiles 获取文件列表（个人云）
 func (c *Client) ListFiles(dirID string, page, pageSize int) ([]*model.FileInfo, error) {
+	return c.ListFilesCtx(context.Background(), ListFilesOptions{DirID: dirID, Page: page, PageSize: pageSize})
+}
+
+type ListFilesOptions struct {
+	DirID    string
+	Page     int
+	PageSize int
+}
+
+// ListFilesCtx 在挂载请求取消时取消上游请求，分页保持从 1 开始。
+func (c *Client) ListFilesCtx(ctx context.Context, opts ListFilesOptions) ([]*model.FileInfo, error) {
 	c.metaMu.Lock()
 	defer c.metaMu.Unlock()
 
@@ -22,45 +35,39 @@ func (c *Client) ListFiles(dirID string, page, pageSize int) ([]*model.FileInfo,
 	}
 	c.syncClientTokens(client)
 
-	// 如果没有指定目录ID，使用根目录
+	dirID := opts.DirID
 	if dirID == "" {
-		dirID = c.getRootFolderID()
-	}
-
-	// 联通云盘 API：根目录使用 "0"（空字符串会导致全量查询）
-	if dirID == "" {
-		dirID = "0"
+		dirID = c.RootFolderID()
 	}
 
 	// Debug log: opt-in to avoid spamming logs under WebDAV.
 	if os.Getenv("WOOPEN_WOPAN_DEBUG") == "1" {
-		fmt.Printf("[DEBUG] ListFiles: dirID='%s', page=%d\n", dirID, page)
+		fmt.Printf("[DEBUG] ListFiles: dirID='%s', page=%d\n", dirID, opts.Page)
 	}
-	pageNum := page - 1
+	pageNum := opts.Page - 1
 	if pageNum < 0 {
 		pageNum = 0
 	}
 
-	files, err := c.listFilesLocked(client, listFilesParams{
+	params := listFilesParams{
+		ctx:      ctx,
 		dirID:    dirID,
 		pageNum:  pageNum,
-		pageSize: pageSize,
-	})
+		pageSize: opts.PageSize,
+	}
+	files, err := c.listFilesLocked(client, params)
 	if err != nil && isLoginFailed(err) {
 		// Token 过期，尝试刷新后重试
 		if refreshErr := client.RefreshToken(); refreshErr != nil {
 			return nil, fmt.Errorf("刷新Token失败: %w", refreshErr)
 		}
-		files, err = c.listFilesLocked(client, listFilesParams{
-			dirID:    dirID,
-			pageNum:  pageNum,
-			pageSize: pageSize,
-		})
+		files, err = c.listFilesLocked(client, params)
 	}
 	return files, err
 }
 
 type listFilesParams struct {
+	ctx      context.Context
 	dirID    string
 	pageNum  int
 	pageSize int
@@ -73,6 +80,9 @@ func (c *Client) listFilesLocked(client *wopan.WoClient, params listFilesParams)
 		params.pageNum,
 		params.pageSize,
 		0, // 默认排序
+		func(req *resty.Request) {
+			req.SetContext(params.ctx)
+		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("获取文件列表失败: %w", err)
@@ -98,7 +108,7 @@ func (c *Client) listFilesLocked(client *wopan.WoClient, params listFilesParams)
 			Size:     f.Size,
 			IsDir:    f.Type == 0, // Type 0 表示目录
 			ModTime:  modTime,
-			ParentID: f.Fid,
+			ParentID: params.dirID,
 		})
 	}
 	return files, nil

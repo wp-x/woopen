@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	listPageSize = 200
+	listPageSize = 100
 	cacheTTL     = 45 * time.Second
 )
 

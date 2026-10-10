@@ -8,6 +8,8 @@ import (
 	"github.com/OpenListTeam/wopan-sdk-go"
 )
 
+const DefaultRootFolderID = "0"
+
 // Client 联通云盘客户端封装
 type Client struct {
 	metaClient      *wopan.WoClient
@@ -173,6 +175,14 @@ func (c *Client) getRootFolderID() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.rootFolderID
+}
+
+// RootFolderID 返回挂载使用的真实根目录 ID，默认与 OpenList 一样为 "0"。
+func (c *Client) RootFolderID() string {
+	if rootID := c.getRootFolderID(); rootID != "" {
+		return rootID
+	}
+	return DefaultRootFolderID
 }
 
 func (c *Client) getDefaultFamilyID() string {

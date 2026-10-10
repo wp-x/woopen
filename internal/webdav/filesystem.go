@@ -15,6 +15,7 @@ import (
 // WopanFS 实现 webdav.FileSystem 接口
 type WopanFS struct {
 	client *wopan.Client
+	rootID string
 
 	dirCacheMu  sync.RWMutex
 	dirCache    map[string]*dirCacheEntry
@@ -34,6 +35,7 @@ type WopanFS struct {
 func NewWopanFS(client *wopan.Client) *WopanFS {
 	return &WopanFS{
 		client:    client,
+		rootID:    client.RootFolderID(),
 		dirCache:  make(map[string]*dirCacheEntry),
 		pathCache: make(map[string]*pathCacheEntry),
 		urlCache:  make(map[string]urlCacheEntry),

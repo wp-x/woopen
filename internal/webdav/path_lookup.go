@@ -24,8 +24,8 @@ func (fs *WopanFS) ResolvePath(ctx context.Context, filePath string) (ResolvedPa
 	cleanPath := path.Clean(filePath)
 	if cleanPath == "/" || cleanPath == "." {
 		return ResolvedPath{
-			ID:       "0",
-			ParentID: "0",
+			ID:       fs.rootID,
+			ParentID: fs.rootID,
 			Info:     nil,
 		}, nil
 	}
@@ -47,14 +47,14 @@ func (fs *WopanFS) ResolvePath(ctx context.Context, filePath string) (ResolvedPa
 //
 // Returns:
 // - id: the object's ID (directory id or file id)
-// - parentID: the parent directory ID ("0" for root)
+// - parentID: the parent directory ID (configured root ID for root)
 // - info: best-effort FileInfo (nil for root)
 func (fs *WopanFS) lookupPath(ctx context.Context, filePath string) (id string, parentID string, info *model.FileInfo, err error) {
 	cleanPath := normalizePath(filePath)
 
 	// 根目录
 	if cleanPath == "/" {
-		return "0", "0", nil, nil
+		return fs.rootID, fs.rootID, nil, nil
 	}
 	if isIgnoredName(cleanPath) {
 		return "", "", nil, os.ErrNotExist
@@ -66,8 +66,8 @@ func (fs *WopanFS) lookupPath(ctx context.Context, filePath string) (id string, 
 
 	// 分割路径
 	parts := strings.Split(strings.Trim(cleanPath, "/"), "/")
-	currentID := "0" // 从根目录开始
-	currentParentID := "0"
+	currentID := fs.rootID
+	currentParentID := fs.rootID
 	currentPath := ""
 
 	// 逐级查找
@@ -103,12 +103,6 @@ func (fs *WopanFS) lookupPath(ctx context.Context, filePath string) (id string, 
 		})
 	}
 
-	fs.setPathCacheEntry(cleanPath, pathCacheEntry{
-		id:       currentID,
-		parentID: currentParentID,
-		info:     info,
-	})
-
 	return currentID, currentParentID, info, nil
 }
 
@@ -123,23 +117,6 @@ func (fs *WopanFS) findChildByName(ctx context.Context, dirID, name string) (*mo
 		}
 	}
 	return nil, os.ErrNotExist
-}
-
-func (fs *WopanFS) listAllInDir(ctx context.Context, dirID string) ([]*model.FileInfo, error) {
-	var out []*model.FileInfo
-	page := 1
-	for {
-		files, err := fs.client.ListFiles(dirID, page, listPageSize)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, files...)
-		if len(files) < listPageSize {
-			break
-		}
-		page++
-	}
-	return out, nil
 }
 
 func (fs *WopanFS) listAllInDirCached(ctx context.Context, dirID string) ([]*model.FileInfo, error) {
